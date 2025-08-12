@@ -6,8 +6,8 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
 #SBATCH --job-name=nhp-pipe
-#SBATCH --error=/ix1/pmayo/outfiles/pipe/out_%A_%a.out
-#SBATCH --output=/ix1/pmayo/outfiles/pipe/out_%A_%a.out
+#SBATCH --error=/ix1/pmayo/outfiles/out_%A_%a.out
+#SBATCH --output=/ix1/pmayo/outfiles/out_%A_%a.out
 #SBATCH --mail-type=done,fail
 #SBATCH --mail-user=knoneman@pitt.edu
 #SBATCH --array=0-1
@@ -24,7 +24,7 @@ echo "======================================================"
 
 SESSION="${1}"
 PROBE_ID=$SLURM_ARRAY_TASK_ID
-PROTOCOL="np_protocol.json"
+PROTOCOL="np_nodrift.json"
 
 echo "SESSION    =  '$SESSION'"
 echo "PROBE_ID   =  $PROBE_ID"

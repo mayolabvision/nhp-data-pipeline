@@ -36,7 +36,7 @@ class NeuropixelProfile(RecordingProfile):
         save_params(self.data_path / "preprocess" / self.preprocess_hash / "params.json",
             self.protocol['preprocessing'])
  
-        if 'motion_correction' in self.protocol and self.protocol['motion_correction']:
+        if self.protocol.get('motion_correction'):
             self.pp_hash, self.motion_hash, self.motion_params = get_motion_hash(self.protocol['motion_correction'])
             save_params(self.data_path / "preprocess" / self.preprocess_hash / self.pp_hash / "params.json",
                 self.protocol['motion_correction']['preprocessing'])
