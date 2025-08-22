@@ -7,24 +7,29 @@ import hashlib
 from config import RAW_DATA_PATH
 
 class RecordingProfile(ABC):
-    def __init__(self, session: str, probe_id: str, protocol_path: str):
+    def __init__(self, session: str, probe_id: int, protocol_path: str):
         self.session = session
         self.probe_id = probe_id
         self.protocol_path = protocol_path
         self.protocol = None
         self.data_path = None
-        self.metadata_path = None
         self.metadata = None
         self.probe_path = None
         self.preprocess_hash = None
         self.preprocess_path = None
         self.motion_hash = None
         self.motion_params = None
+        self.sorter_path = None
+        self.sorter_hash = None
+        self.sorter_params = None
+        self.full_hash = None
+        self.analyzer_path = None
+        self.metrics_path = None
 
     def load_metadata(self):
         """Load metadata.json for this session."""
-        self.metadata_path = Path(RAW_DATA_PATH) / self.session / "metadata.json"
-        with open(self.metadata_path, "r") as f:
+        metadata_path = Path(RAW_DATA_PATH) / self.session / "metadata.json"
+        with open(metadata_path, "r") as f:
             self.metadata = json.load(f)
 
     def load_protocol(self):
@@ -35,7 +40,7 @@ class RecordingProfile(ABC):
     @abstractmethod
     def prep_session_data(self):
         """Check and prepare raw data for processing."""
-        pass
+        return self
 
     @abstractmethod
     def make_probe_map(self):
@@ -45,5 +50,20 @@ class RecordingProfile(ABC):
     @abstractmethod
     def preprocessing(self):
         """Applying preprocessing to raw recording."""
+        pass
+    
+    @abstractmethod
+    def spike_sorting(self):
+        """Applying spike sorting to preprocessed recording."""
+        pass
+    
+    @abstractmethod
+    def postprocessing(self):
+        """Applying postprocessing."""
+        pass
+    
+    @abstractmethod
+    def quality_metrics(self):
+        """Calculate quality metrics from sorting_analyzer."""
         pass
  

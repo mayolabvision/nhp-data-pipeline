@@ -21,18 +21,36 @@ def run_preprocess(session, probe_id=0, protocol=None):
     profile.preprocessing()
 
 def run_sorting(session, probe_id=0, protocol=None):
-    # Get appropriate recording profile class, based on probe type
     profile_cls = get_recording_profile(session, probe_id)
     profile = profile_cls(session, probe_id, Path(PROTOCOLS_PATH) / protocol)
 
     profile.load_metadata()
     profile.load_protocol()
+    profile.prep_session_data()
+    
+    # Run sorting
+    profile.spike_sorting()
 
-    # Check data exists and is formatted correctly
+def run_postprocess(session, probe_id=0, protocol=None):
+    profile_cls = get_recording_profile(session, probe_id)
+    profile = profile_cls(session, probe_id, Path(PROTOCOLS_PATH) / protocol)
+
+    profile.load_metadata()
+    profile.load_protocol()
+    profile.prep_session_data()
+    
+    profile.postprocessing()
+    #profile.quality_metrics()
+
+def profile_to_mat(session, protocol=None):
+    profile_cls = get_recording_profile(session, 0)
+    profile = profile_cls(session, 0, Path(PROTOCOLS_PATH) / protocol)
+
+    profile.load_metadata()
+    profile.load_protocol()
     profile.prep_session_data()
 
-    # Make probe map
-    profile.make_probe_map()
+    # Get only the part after "sorting"
+    sorter_path = str(profile.sorter_path).split("sorting", 1)[1].lstrip("/\\")
 
-    profile.preprocessing()
-
+    return sorter_path

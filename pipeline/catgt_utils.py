@@ -10,7 +10,7 @@ def run_catgt(session: str, raw_data_root: Path):
     catgt_dir = raw_data_root / f"{session}" / f"catgt_{session}"
 
     if not catgt_dir.is_dir():
-        print(f"CatGT output not found for {session}. Running CatGT...")
+        #print(f"CatGT output not found for {session}. Running CatGT...")
         cmd = [
             str(runit_path),
             f"-dir={raw_data_root}",
@@ -24,5 +24,5 @@ def run_catgt(session: str, raw_data_root: Path):
             f"-dest={raw_data_root / session}"
         ]
         subprocess.run(cmd, check=True)
-    else:
-        print(f"CatGT output already exists for {session}, skipping.")
+    #else:
+        #print(f"CatGT output already exists for {session}, skipping.")

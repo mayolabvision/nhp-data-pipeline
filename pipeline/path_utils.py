@@ -4,6 +4,7 @@ from pathlib import Path
 import copy
 
 from spikeinterface.preprocessing import get_motion_parameters_preset
+from spikeinterface.sorters import get_default_sorter_params
 
 def save_params(params_path: Path, params: dict):
     """Save params dict to JSON file at params_path if the file does not already exist."""
@@ -19,7 +20,7 @@ def get_preprocess_hash(preprocessing_params: dict):
     # 2. Hash the serialized string
     params_hash = hashlib.md5(params_str.encode('utf-8')).hexdigest()
     
-    print("preprocess_hash:", params_hash)
+    #print("preprocess_hash:", params_hash)
     
     return params_hash
 
@@ -28,21 +29,37 @@ def get_motion_hash(motion_params: dict):
 
     # 1. Get custom params (only differences + 'method')
     custom_params = prune_params(motion_params, default_params)
-    print("Custom params:", custom_params)
+    #print("Custom params:", custom_params)
     
     pp_str = json.dumps(custom_params['preprocessing'], sort_keys=True)
     pp_hash = hashlib.md5(pp_str.encode('utf-8')).hexdigest()
-    print("pp_hash:", pp_hash)
+    #print("pp_hash:", pp_hash)
    
     custom_params_motion = {k: v for k, v in custom_params.items() if k != 'preprocessing'} 
     params_str = json.dumps(custom_params_motion, sort_keys=True)
     params_hash = hashlib.md5(params_str.encode('utf-8')).hexdigest()
-    print("motion_hash:", params_hash)
+    #print("motion_hash:", params_hash)
     
     # 2. Get full params by merging custom into default
     full_params = merge_params(default_params, custom_params)
 
     return pp_hash, params_hash, full_params
+
+def get_sorter_hash(sorter_params: dict):
+    default_params = get_default_sorter_params(sorter_params['sorter_name'])
+
+    # 1. Get custom params (only differences + 'method')
+    custom_params = prune_params(sorter_params, default_params)
+    #print("Custom params:", custom_params)
+    
+    params_str = json.dumps(custom_params, sort_keys=True)
+    params_hash = hashlib.md5(params_str.encode('utf-8')).hexdigest()
+    #print("sorter_hash:", params_hash)
+    
+    # 2. Get full params by merging custom into default
+    full_params = merge_params(default_params, custom_params)
+    
+    return params_hash, full_params, custom_params
 
 def prune_params(custom, default):
     """

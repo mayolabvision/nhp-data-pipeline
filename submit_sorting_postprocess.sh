@@ -1,11 +1,12 @@
 #!/bin/bash -l
 #SBATCH --nodes=1
-#SBATCH --time=0-02:00:00
-#SBATCH --cluster=smp
-#SBATCH --partition=high-mem
+#SBATCH --time=0-16:00:00
+#SBATCH --gres=gpu:2
+#SBATCH --cluster=gpu
+#SBATCH --partition=a100_nvlink
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=32
-#SBATCH --job-name=nhp-pipe
+#SBATCH --cpus-per-task=24
+#SBATCH --job-name=pipe-sorting
 #SBATCH --error=/ix1/pmayo/outfiles/out_%A_%a.out
 #SBATCH --output=/ix1/pmayo/outfiles/out_%A_%a.out
 #SBATCH --mail-type=done,fail
@@ -14,7 +15,7 @@
 
 # ----- Load environment -----
 module purge
-module load python/ondemand-jupyter-python3.10
+module load python/ondemand-jupyter-python3.9
 
 ENV_PATH=$(python -c "import config; print(config.ENV_PATH)")
 source activate "$ENV_PATH"
@@ -24,7 +25,7 @@ echo "======================================================"
 
 SESSION="${1}"
 PROBE_ID=$SLURM_ARRAY_TASK_ID
-PROTOCOL="np_nodrift.json"
+PROTOCOL="np_medicine.json"
 
 echo "SESSION    =  '$SESSION'"
 echo "PROBE_ID   =  $PROBE_ID"
@@ -33,13 +34,25 @@ echo "PROTOCOL   =  $PROTOCOL"
 echo "======================================================"
 
 #################################################################
-##################### RUN SI (PP + Sort) ########################
+####################### RUN SI Sorting ##########################
 
-echo "Running preprocessing pipeline........................"
+echo "Running spike sorting pipeline........................"
 $CONDA_PREFIX/bin/python -c "
-from main_pipeline import run_preprocess
+from main_pipeline import run_sorting
 
-run_preprocess(
+run_sorting(
+    '${SESSION}', 
+    probe_id=int('$PROBE_ID'),
+    protocol='${PROTOCOL}' 
+)"
+
+echo "======================================================"
+
+echo "Running postprocessing pipeline........................"
+$CONDA_PREFIX/bin/python -c "
+from main_pipeline import run_postprocess
+
+run_postprocess(
     '${SESSION}', 
     probe_id=int('$PROBE_ID'),
     protocol='${PROTOCOL}' 

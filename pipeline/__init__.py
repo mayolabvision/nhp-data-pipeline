@@ -18,10 +18,12 @@ def get_recording_profile(session, probe_id):
     with open(metadata_path, "r") as f:
         metadata = json.load(f)
 
-    probe_type = metadata["probe_types"][probe_id]
-    print(f"Detected probe type: {probe_type}")
+    probe_type = metadata["probe_type"][probe_id]
+    #print(f"Detected probe type: {probe_type}")
 
     try:
         return RECORDING_PROFILE_MAP[probe_type.lower()]
     except KeyError:
         raise ValueError(f"No recording profile found for probe type '{probe_type}'")
+
+

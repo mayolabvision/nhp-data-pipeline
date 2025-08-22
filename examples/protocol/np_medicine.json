@@ -1,0 +1,100 @@
+{
+    "preprocessing": {
+        "highpass_filter": {
+            "freq_min": 300, 
+            "dtype": "int16"
+        },
+        "detect_and_remove_bad_channels": {},
+        "phase_shift": {},
+        "common_reference": {
+            "operator": "median", 
+            "reference": "global"
+        }
+    },
+
+    "motion_correction": {
+        "preprocessing": {
+            "bandpass_filter": {
+                "freq_min": 300, 
+                "freq_max": 5000, 
+                "dtype": "int16"
+            },
+            "detect_and_remove_bad_channels": {},
+            "phase_shift": {},
+            "common_reference": {
+                "operator": "median", 
+                "reference": "global"
+            }
+        },
+        "detect_kwargs": {},
+        "localize_peaks_kwargs": {},
+        "estimate_motion_kwargs": {
+            "win_scale_um": 300.0, 
+            "motion_bound": 800, 
+            "time_kernel_width": 20,
+            "method": "medicine" 
+        },
+        "interpolate_motion_kwargs":{
+            "border_mode": "force_extrapolate"
+        }
+    },
+    
+    "sorting":{
+        "sorter_name": "kilosort4",
+        "do_correction": false,
+        "Th_universal": 9,
+        "Th_learned": 8,
+        "whitening_range": 12,
+        "dminx": 32,
+        "ccg_threshold": 0.25 
+    },
+
+    "postprocessing":{
+        "isi_histograms": {},
+        "correlograms": {},
+        "acgs_3d": {},
+        "noise_levels": {},
+        "random_spikes": {
+            "method": "uniform", 
+            "max_spikes_per_unit": 1000 
+        },
+        "waveforms": {
+            "ms_before": 1.5, 
+            "ms_after": 2
+        },
+        "principal_components": {},
+        "templates": {
+            "operators": ["average", "median", "std"]
+        },
+        "amplitude_scalings": {},
+        "spike_amplitudes": {},
+        "spike_locations": {
+            "method": "monopolar_triangulation"
+        },
+        "template_metrics": {
+            "include_multi_channel_metrics": true
+        },
+        "template_similarity": {},
+        "unit_locations": {
+            "method": "monopolar_triangulation"
+        }
+    },
+
+    "quality_metrics":{
+        "num_spikes": {},
+        "firing_rate": {},
+        "presence_ratio": {},
+        "snr": {},
+        "isi_violation": {},
+        "rp_violation": {},
+        "sliding_rp_violation": {},
+        "amplitude_cutoff": {},
+        "amplitude_median": {},
+        "amplitude_cv": {},
+        "synchrony": {},
+        "firing_range": {},
+        "drift": {},
+        "sd_ratio": {},
+        "noise_cutoff": {}
+    } 
+}

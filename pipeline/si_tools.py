@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import numpy as np
+import pandas as pd
 
 from spikeinterface.core import set_global_job_kwargs
 from spikeinterface.extractors import get_neo_streams, read_spikeglx
@@ -34,12 +35,11 @@ def load_or_compute_peaks(preprocess_path, recording, protocol):
 
 def run_preprocessing_with_motion_correction(data_path, probe_id, protocol, preprocess_path):
     os.makedirs(preprocess_path, exist_ok=True)
+    
+    stream_names, stream_ids = get_neo_streams('spikeglx', data_path)
+    raw_recording = read_spikeglx(data_path, stream_name=f'imec{probe_id}.ap', load_sync_channel=False)
 
     if not (preprocess_path / 'motion.npy').exists():
-        # This gets stream info if needed (unused here but might be needed)
-        stream_names, stream_ids = get_neo_streams('spikeglx', data_path)
-
-        raw_recording = read_spikeglx(data_path, stream_name=f'imec{probe_id}.ap', load_sync_channel=False)
         pp_recording1 = apply_preprocessing_pipeline(raw_recording, protocol['motion_correction']['preprocessing'])
 
         peaks, peak_locations = load_or_compute_peaks(preprocess_path, pp_recording1, protocol['motion_correction'])
@@ -68,8 +68,8 @@ def run_preprocessing_with_motion_correction(data_path, probe_id, protocol, prep
         depth_bins = np.load(preprocess_path / 'depth_bins.npy')
         
         motion_object = Motion(
-            displacement=motion,
-            temporal_bins_s=time_bins,
+            displacement=[motion[0]],
+            temporal_bins_s=[time_bins[0]],
             spatial_bins_um=depth_bins,
         )
 
@@ -97,3 +97,47 @@ def save_processed_recording(recording, preprocess_path):
     recording = recording.astype(int)
     recording = recording.save(folder=preprocess_path, format='binary', dtype='int16', overwrite=True)
     return recording
+
+######################################################################################################
+
+def find_missing_extensions(extensions_dir, requested_extensions):
+    """
+    Compare the requested extensions against the existing ones in `extensions_dir`
+    and return a dictionary of the missing extensions.
+    """
+    # Get all folder names in the extensions directory
+    existing = {name for name in os.listdir(extensions_dir)
+                if os.path.isdir(os.path.join(extensions_dir, name))}
+    
+    # Keep only requested ones that are NOT in existing
+    missing = {k: v for k, v in requested_extensions.items() if k not in existing}
+    
+    return missing
+
+######################################################################################################
+def add_extension_arrays_to_metrics(extensions_path: Path, metrics: pd.DataFrame) -> pd.DataFrame:
+    """
+    Loop through extension directories in `extensions_path`, find .npy files
+    whose shape[0] matches the number of rows in `metrics`, and add them as new columns.
+
+    Each .npy filename (without extension) becomes the column name.
+    If the file has extra dimensions beyond the first, the row stores that subarray.
+    """
+    n_rows = metrics.shape[0]
+
+    for ext_dir in extensions_path.iterdir():
+        if ext_dir.is_dir():
+            for npy_file in ext_dir.glob("*.npy"):
+                data = np.load(npy_file, allow_pickle=True)
+
+                # Only add if first dimension matches
+                if data.shape[0] == n_rows:
+                    col_name = npy_file.stem  # filename without ".npy"
+
+                    # If data is more than 1D, keep row-wise slices as arrays
+                    if data.ndim > 1:
+                        metrics.loc[:, col_name] = [row for row in data]
+                    else:
+                        metrics[col_name] = data
+
+    return metrics

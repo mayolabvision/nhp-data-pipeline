@@ -1,0 +1,11 @@
+{
+  "sess_name": "kendra_scrappy_0000a",
+  "probe_label": ["left_FEF"],
+  "probe_type": ["fhc"],
+  "probe_config": ["125um"],
+  "hardware_config": ["elec-A"],
+  "probe_depth_mm": [0.0],
+  "probe_gridHole": [["a1","m1"]],
+
+  "HEeye_VEeye_diode_pupil": ["10241","10242","10243","10244"]
+}

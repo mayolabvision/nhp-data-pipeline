@@ -1,14 +1,27 @@
 import numpy as np
 from pathlib import Path
+import pandas as pd
 import os
 import json
+
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+warnings.filterwarnings("ignore", category=pd.errors.SettingWithCopyWarning)
 
 from .base import RecordingProfile
 from config import RAW_DATA_PATH
 from .catgt_utils import run_catgt
 from .SGLXMetaToCoords import MetaToCoords
-from .path_utils import get_preprocess_hash, get_motion_hash, save_params
-from .si_preprocess import run_preprocessing_with_motion_correction, run_preprocessing_without_motion_correction, save_processed_recording
+from .path_utils import get_preprocess_hash, get_motion_hash, save_params, get_sorter_hash
+from .si_tools import run_preprocessing_with_motion_correction, run_preprocessing_without_motion_correction, save_processed_recording
+from .si_tools import find_missing_extensions, add_extension_arrays_to_metrics
+from .ks_tools import convert_npy_to_mat, get_best_channels
+
+from spikeinterface.sorters import run_sorter
+from spikeinterface.core import load
+from spikeinterface import create_sorting_analyzer, load_sorting_analyzer
+from spikeinterface.qualitymetrics import compute_quality_metrics
 
 class NeuropixelProfile(RecordingProfile):
     def prep_session_data(self):
@@ -16,47 +29,137 @@ class NeuropixelProfile(RecordingProfile):
         self.data_path = Path(RAW_DATA_PATH) / self.session / f"{self.session}_imec{self.probe_id}"
         if not self.data_path.is_dir():
             raise FileNotFoundError(f"Raw data directory not found: {self.data_path}")
-        print(f"✓ Raw data found: {self.data_path}")
+        #print(f"✓ Raw data found: {self.data_path}")
 
         # 2. Run CatGT if needed, pulls out imec sync pulses
         run_catgt(self.session, Path(RAW_DATA_PATH))
 
-    def make_probe_map(self):
+        #### 3. Set up paths to each part of pipeline ####
+        # A. Make probe map
         self.probe_path = self.data_path / f"{self.session}_t0.imec{self.probe_id}.ap_kilosortChanMap.mat"
+        
+        # B. Preprocessing
+        self.preprocess_hash = get_preprocess_hash(self.protocol['preprocessing'])    
+        if self.protocol.get('motion_correction'):
+            self.pp_hash, self.motion_hash, self.motion_params = get_motion_hash(self.protocol['motion_correction'])
+            self.preprocess_path = self.data_path / "preprocess" / self.preprocess_hash / self.pp_hash / self.motion_hash
+        else:
+            self.preprocess_path = self.data_path / "preprocess" / self.preprocess_hash / "nodrift"
+            self.motion_hash = "nodrift"           
 
+        # C. Spike sorting
+        self.sorter_hash, self.sorter_params, _ = get_sorter_hash(self.protocol['sorting'])
+        self.full_hash = "-".join([self.preprocess_hash, self.motion_hash, self.sorter_hash])
+        self.sorter_path = self.data_path / "sorting" / self.full_hash
+ 
+        # D. Postprocessing
+        self.analyzer_path = self.sorter_path / 'analyzer'
+
+        # E. Quality metrics
+        self.metrics_path = self.sorter_path / 'quality_metrics'
+
+    def make_probe_map(self):
         if not self.probe_path.exists():
             MetaToCoords(self.probe_path.parent / f"{self.session}_t0.imec{self.probe_id}.ap.meta",
                          1, badChan=np.zeros((0), dtype='int'), destFullPath='', showPlot=True)
-            print(f"✓ Probe map made: {self.probe_path}")
-        else:
-            print(f"Probe map already exists, skipping make_probe_map")
+            #print(f"✓ Probe map made: {self.probe_path}")
+        #else:
+            #print(f"Probe map already exists, skipping make_probe_map")
 
     def preprocessing(self):
-        self.preprocess_hash = get_preprocess_hash(self.protocol['preprocessing'])    
         save_params(self.data_path / "preprocess" / self.preprocess_hash / "params.json",
-            self.protocol['preprocessing'])
- 
-        if self.protocol.get('motion_correction'):
-            self.pp_hash, self.motion_hash, self.motion_params = get_motion_hash(self.protocol['motion_correction'])
-            save_params(self.data_path / "preprocess" / self.preprocess_hash / self.pp_hash / "params.json",
-                self.protocol['motion_correction']['preprocessing'])
+                    self.protocol['preprocessing'])
+        
+        if not (self.preprocess_path / 'output' / 'traces_cached_seg0.raw').is_file(): 
+            if self.protocol.get('motion_correction'):
+                mc_recording = run_preprocessing_with_motion_correction(self.data_path, self.probe_id, self.protocol, self.preprocess_path)
+                mc_recording = save_processed_recording(mc_recording, self.preprocess_path / 'output')
+                
+                save_params(self.data_path / "preprocess" / self.preprocess_hash / self.pp_hash / "params.json",
+                            self.protocol['motion_correction']['preprocessing'])
+                save_params(self.data_path / "preprocess" / self.preprocess_hash / self.pp_hash / self.motion_hash / "params.json",
+                            self.motion_params)
             
-            save_params(self.data_path / "preprocess" / self.preprocess_hash / self.pp_hash / self.motion_hash / "params.json",
-                self.motion_params)
-            
-            self.preprocess_path = self.data_path / "preprocess" / self.preprocess_hash / self.pp_hash / self.motion_hash
-            mc_recording = run_preprocessing_with_motion_correction(self.data_path, self.probe_id, self.protocol, self.preprocess_path)
-            print(f"✓ Preprocessing w/ drift correction complete...")
+                print(f"✓ Preprocessed data w/ drift correction saved: {self.preprocess_path}")
+            else:
+                mc_recording = run_preprocessing_without_motion_correction(self.data_path, self.probe_id, self.protocol, self.preprocess_path)
+                mc_recording = save_processed_recording(mc_recording, self.preprocess_path / 'output')
+                
+                print(f"✓ Preprocessed data w/out drift correction saved: {self.preprocess_path}")
 
         else:
-            self.preprocess_path = self.data_path / "preprocess" / self.preprocess_hash / "nodrift"
-            mc_recording = run_preprocessing_without_motion_correction(self.data_path, self.probe_id, self.protocol, self.preprocess_path)
-            print(f"✓ Preprocessing w/out drift correction complete...")
+            print("Preprocessed data already exists, skipping save_preprocessed_recording")
 
-        if not (self.preprocess_path / 'output' / 'traces_cached_seg0.raw').is_file():
-            mc_recording = save_processed_recording(mc_recording, self.preprocess_path / 'output')
-            print(f"✓ Preprocessed data saved: {self.preprocess_path}")
-        else:
-            print(f"Preprocessed data already exists, skipping save_preprocessed_recording")
+    def spike_sorting(self):
+        if not (self.sorter_path / 'params.json').is_file():
+            recording = load(self.preprocess_path / 'output')
+
+            _, _, custom_sorter_params = get_sorter_hash(self.protocol['sorting'])
+            sorting = run_sorter(recording=recording, folder=self.sorter_path, 
+                                 verbose=True, save_preprocessed_copy=False, docker_image=False,
+                                 clear_cache=True, **custom_sorter_params)
             
+            save_params(self.data_path / "sorting" / self.full_hash / "params.json", 
+                            self.protocol)
+            print(f"✓ Spike sorting outputs saved: {self.sorter_path}")
+        else:
+            print("Sorted outputs already exist, skipping spike sorting")
+
+        convert_npy_to_mat(self.sorter_path / 'sorter_output')
+
+    def postprocessing(self):
+        recording = load(self.preprocess_path / 'output')
+        sorting = load(self.sorter_path)
+
+        if not self.analyzer_path.is_dir():
+            analyzer = create_sorting_analyzer(sorting=sorting, recording=recording, format="binary_folder", sparse=True,
+                                               return_in_uV=True, folder=self.analyzer_path)
+            print(f"✓ Postprocessing sorting_analyzer saved: {self.analyzer_path}")
+        else:
+            analyzer = load_sorting_analyzer(self.analyzer_path)
+            print("sorting_analyzer already exists, loading in extensions")
+
+        extensions_dir = self.analyzer_path / "extensions"
+        extensions_dir.mkdir(parents=True, exist_ok=True)
+        extensions_to_run = find_missing_extensions(extensions_dir, self.protocol["postprocessing"]) 
+        if extensions_to_run:
+            analyzer.compute(extensions_to_run)
+            
+            save_params(self.analyzer_path / "params.json", self.protocol['postprocessing'])
+            print("✓ Extensions ran:", extensions_to_run)
+        else:
+            print("all postprocessing extensions have already been ran")
+
+    def quality_metrics(self):
+        analyzer = load_sorting_analyzer(self.analyzer_path)
+
+        #if not self.metrics_path.is_file():
+        metrics = compute_quality_metrics(
+                analyzer,
+                metric_names=list(self.protocol['quality_metrics'].keys()),
+                metric_params=self.protocol['quality_metrics'])
+       
+        metrics["sess_name"] = self.metadata["sess_name"]
+        metrics["probe_id"] = self.probe_id
+        metrics["cluster_id"] = metrics.index
+        for key in ["probe_label", "probe_type", "probe_config",
+                    "hardware_config", "probe_depth_mm", "probe_gridHole"]:
+            value = self.metadata[key][self.probe_id]
+            metrics[key] = [value] * len(metrics)        
+
+        # Specify the order you want
+        if self.protocol['sorting']['sorter_name'] == 'kilosort4':
+            metrics["best_channel"] = get_best_channels(self.sorter_path / 'sorter_output')
+            new_cols = ["sess_name","probe_id","cluster_id","best_channel","probe_label","probe_type","probe_config",
+                        "hardware_config","probe_depth_mm","probe_gridHole"]
+        else:
+            new_cols = ["sess_name","probe_id","cluster_id","probe_label","probe_type","probe_config",
+                        "hardware_config","probe_depth_mm","probe_gridHole"]
+
+        metrics = metrics[new_cols + [col for col in metrics.columns if col not in new_cols]]
+        metrics = add_extension_arrays_to_metrics(self.analyzer_path / "extensions", metrics)
+
+        save_params(self.metrics_path / "params.json", self.protocol['quality_metrics'])
+        metrics.to_csv(self.metrics_path / 'cluster_metrics.csv', index=False)
+        print("✓ Quality metrics calculated.")
 

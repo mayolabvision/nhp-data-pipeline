@@ -1,0 +1,11 @@
+{
+  "sess_name": "kendra_scrappy_0000a",
+  "probe_label": [],
+  "probe_type": [],
+  "probe_config": [],
+  "hardware_config": [],
+  "probe_depth_mm": [],
+  "probe_gridHole": [],
+
+  "HEeye_VEeye_diode_pupil": ["10241","10242","10243","10244"]
+}
