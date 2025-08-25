@@ -18,14 +18,16 @@ function process_fullRecording(session_name,varargin)
     addParameter(p, 'NEVUTIL_PATH', defaultNEV_PATH, @ischar);
     addParameter(p, 'NASNET_PATH', defaultNET_PATH, @ischar); % only used for plex
     addParameter(p, 'SORTER_PATH', [], @ischar);
+    addParameter(p, 'PROTOCOL_PATH', [], @ischar);
     
     % Parse inputs
     parse(p, session_name, varargin{:});
-    RAW_PATH    = p.Results.RAW_DATA_PATH;
-    OUT_PATH    = p.Results.OUT_DATA_PATH;
-    NEV_PATH    = p.Results.NEVUTIL_PATH;
-    NET_PATH    = p.Results.NASNET_PATH;
-    SORTER_PATH = p.Results.SORTER_PATH;
+    RAW_PATH       =  p.Results.RAW_DATA_PATH;
+    OUT_PATH       =  p.Results.OUT_DATA_PATH;
+    NEV_PATH       =  p.Results.NEVUTIL_PATH;
+    NET_PATH       =  p.Results.NASNET_PATH;
+    SORTER_PATH    =  p.Results.SORTER_PATH;
+    PROTOCOL_PATH  =  p.Results.PROTOCOL_PATH;
 
     addpath(genpath(NEV_PATH));
 
@@ -41,13 +43,22 @@ function process_fullRecording(session_name,varargin)
     session_path = fullfile(RAW_PATH, session_name);
     filePattern = fullfile(RAW_PATH, session_name, '*.ns5');
 
+    S1 = struct();
+
     if isfile(fullfile(session_path,'metadata.json'))
         metadata = loadMetadataJSON(fullfile(session_path,'metadata.json'));
         Tmeta = struct2table(rmfield(metadata, {'sess_name', 'HEeye_VEeye_diode_pupil'}));
+
+        S1.sess_name = metadata.sess_name;
+    else
+        S1.sess_name = session_name;
     end
 
-    S1 = struct();
-    S1.sess_name = metadata.sess_name;
+    if isfile(PROTOCOL_PATH)
+        jsonStr = fileread(PROTOCOL_PATH);
+        protocolStruct = jsondecode(jsonStr);
+        S1.protocol = protocolStruct;
+    end
 
     % Create the search pattern to find files that start with 'filename' and end with '.ns5'
     raw_files = dir(filePattern);
@@ -61,7 +72,7 @@ function process_fullRecording(session_name,varargin)
     nevpaths = raw_filepaths(idx);
 
     % Define possible task keywords
-    task_keywords = {'rfmp', 'rfMapping', 'purs', 'pursuit', 'mdir', 'dirmem', 'fstm'};
+    task_keywords = {'rfmp', 'rfMapping', 'purs', 'pursuit', 'mdir', 'dirmem', 'fstm', 'cfix'};
     
     % Initialize cell array for tasks
     tasks = cell(size(nevnames));
@@ -97,14 +108,14 @@ function process_fullRecording(session_name,varargin)
         alignTimes = alignTimes(alignCodes>0);
 
         imec_meta = cell(numel(imec_dirs),3);
-        for imec = 1:numel(imec_dirs)
-            lfp_ap_path = fullfile(imec_dirs{imec}, [session_name, sprintf('_t0.imec%d',imec_nums{imec})]);
+        for probe = 1:numel(imec_dirs)
+            lfp_ap_path = fullfile(imec_dirs{probe}, [session_name, sprintf('_t0.imec%d',imec_nums{probe})]);
 
             % read in meta data for lfp
             lfp_meta = readMetaFile([lfp_ap_path,'.lf.meta']);
             ap_meta = readMetaFile([lfp_ap_path,'.ap.meta']);
 
-            imec_meta(imec,:) = {(imec), ap_meta, lfp_meta};
+            imec_meta(probe,:) = {(probe), ap_meta, lfp_meta};
         end
 
         imec_meta = cell2table(imec_meta,'VariableNames', {'probe_index','ap_meta','lfp_meta'});
@@ -222,40 +233,57 @@ function process_fullRecording(session_name,varargin)
         S1.(this_task).hdr = out_ns5.hdr;
 
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% KILOSORT/NEUROPIXELS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        imec_dirs = {'/Volumes/SHARED_STUFF/lab_NHPdata-processed/kendra_scrappy_0161a_g0/kendra_scrappy_0161a_g0_imec0';'/Volumes/SHARED_STUFF/lab_NHPdata-processed/kendra_scrappy_0161a_g0/kendra_scrappy_0161a_g0_imec1'};
         if SORTER_PATH
-            kilosort_all = []; trlAvg_frs_all = cell(1,numel(imec_dirs)); 
-            for imec = 1:numel(imec_dirs)
-                %kilosort4_path = fullfile(imec_dirs{imec}, ['kilosort4_', RUN_TYPE]);
-                kilosort4_path = fullfile(imec_dirs{imec}, 'sorting', SORTER_PATH);
+            kilosort_all = []; 
+            if ismember('neuropixel',metadata.probe_type)
+                trlAvg_frs_all = cell(1,numel(imec_dirs)); 
+                for probe = 1:numel(imec_dirs)
+                    %kilosort4_path = fullfile(imec_dirs{imec}, ['kilosort4_', RUN_TYPE]);
+                    kilosort4_path = fullfile(imec_dirs{probe}, 'sorting', SORTER_PATH);
+    
+                    if isfolder(kilosort4_path)
+                        [spikes_perTrial,kilosort,trlAvg_frs] = parse_KilosortToTbl(tbl,fullfile(kilosort4_path,'sorter_output'),'NP_ALIGN_PULSES',these_alignTimes,'Fs',S1.metadata.ap_meta(probe).imSampRate);
+                        tbl.(sprintf('spiketimes_%d',probe)) = spikes_perTrial;
+                        trlAvg_frs_all{probe} = trlAvg_frs;
+                        
+                        if nevnum==1
+                            kilosort.probe_index = probe;
+                            fields = fieldnames(kilosort);
+                            fields(strcmp(fields, 'probe_index')) = [];
+                            kilosort = orderfields(kilosort, ['probe_index'; fields]);
+        
+                            if isfile(fullfile(kilosort4_path,'quality_metrics','cluster_metrics.csv'))
+                                metrics = parse_clusterMetrics(kilosort4_path);
+                                kilosort.clusters = [metrics removevars(kilosort.clusters, 'cluster_id')];
+                            else
+                                kilosort.clusters.sess_name = repmat(S1.sess_name,height(kilosort.clusters),1);
+                                kilosort.clusters.probe_id = repmat(S1.metadata.probe_index(probe)-1,height(kilosort.clusters),1);
+                                kilosort.clusters.probe_label = repmat(S1.metadata.probe_label{probe},height(kilosort.clusters),1);
+                                kilosort.clusters.probe_type = repmat(S1.metadata.probe_type{probe},height(kilosort.clusters),1);
+                                kilosort.clusters.probe_config = repmat(S1.metadata.probe_config{probe},height(kilosort.clusters),1);
+                                kilosort.clusters.hardware_config = repmat(S1.metadata.hardware_config{probe},height(kilosort.clusters),1);
+                                kilosort.clusters.probe_depth_mm = repmat(S1.metadata.probe_depth_mm(probe),height(kilosort.clusters),1);
+                                kilosort.clusters.probe_gridHole = repmat({S1.metadata.probe_gridHole{probe}},height(kilosort.clusters),1);
+                            end
+                            kilosort.clusters.probe_index = repmat(probe,height(kilosort.clusters),1);
+                            kilosort.clusters = movevars(kilosort.clusters,{'probe_index'},'After','sess_name');
+     
+                            kilosort_all = [kilosort_all; kilosort];
 
-                if isfolder(kilosort4_path)
-                    [spikes_perTrial,kilosort,trlAvg_frs] = parse_KilosortToTbl(tbl,fullfile(kilosort4_path,'sorter_output'),'NP_ALIGN_PULSES',these_alignTimes);
-                    kilosort.probe_index = imec;
-                    fields = fieldnames(kilosort);
-                    fields(strcmp(fields, 'probe_index')) = [];
-                    kilosort = orderfields(kilosort, ['probe_index'; fields]);
-
-                    metrics = readtable(fullfile(kilosort4_path,'quality_metrics','cluster_metrics.csv'));
-                    kilosort.clusters = [metrics, kilosort.clusters];
-                    
-                    % kilosort.clusters.sess_name = repmat({metadata.sess_name}, height(kilosort.clusters), 1);
-                    kilosort.clusters = movevars(kilosort.clusters,{'sess_name'},'Before','imec');
-                    kilosort.clusters.sess_name = categorical(kilosort.clusters.sess_name);
-
-                    trlAvg_frs_all{imec} = trlAvg_frs;
-                    kilosort_all = [kilosort_all; kilosort];
-
-                    tbl.(sprintf('spiketimes_%d',imec)) = spikes_perTrial;
-                end 
+                            if probe==numel(imec_dirs)
+                                S1.kilosort = kilosort_all;
+                            end
+                        end
+    
+                        
+                    end 
+                end
             end
 
-            if nevnum==1
-                S1.kilosort = kilosort_all;
-            end
-
-            for imec = 1:numel(imec_dirs)
-                if ~isempty(trlAvg_frs_all{imec})
-                    S1.kilosort(imec).clusters.([this_task, '_Hz']) = trlAvg_frs_all{imec};
+            for probe = 1:numel(imec_dirs)
+                if ~isempty(trlAvg_frs_all{probe})
+                    S1.kilosort(probe).clusters.([this_task, '_Hz']) = trlAvg_frs_all{probe};
                 end
             end
  
@@ -268,12 +296,9 @@ function process_fullRecording(session_name,varargin)
         end
 
         % Remove trials with absolutely no spikes in them
-        colnames = {'spiketimes_1', 'spiketimes_2'};
-        col_found = colnames(ismember(colnames, tbl.Properties.VariableNames));
-        
-        if ~isempty(col_found)
-            spike_column = tbl.(col_found{1});
-            tbl(cellfun(@(q) sum(cellfun(@(w) numel(w), q, 'uni', 1)), tbl.(col_found{1}), 'uni', 1) == 0, :) = [];
+        colnames = tbl.Properties.VariableNames(contains(tbl.Properties.VariableNames, 'spiketimes'));
+        if ~isempty(colnames)
+            tbl(cellfun(@(q) sum(cellfun(@(w) numel(w), q, 'uni', 1)), tbl.(colnames{1}), 'uni', 1) == 0, :) = [];
         end
 
         tbl.sess_name = repmat({session_name}, height(tbl), 1);
@@ -284,6 +309,15 @@ function process_fullRecording(session_name,varargin)
         S1.(this_task).tbl = tbl;
     
     end
+
+    % Re-order fields of struct 
+    ff = fieldnames(S1);
+    newOrder = ff(ismember(ff, {'sess_name', 'metadata'}));
+    if ismember('kilosort', ff)
+        newOrder = [newOrder; 'kilosort'];
+    end
+    newOrder = [newOrder; ff(~ismember(ff, newOrder))];
+    S1 = orderfields(S1, newOrder);
 
     % Save the structure S to the specified file
     S = unify_taskTables(S1,taskTypes);
