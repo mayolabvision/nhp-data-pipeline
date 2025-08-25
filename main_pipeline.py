@@ -40,7 +40,7 @@ def run_postprocess(session, probe_id=0, protocol=None):
     profile.prep_session_data()
     
     profile.postprocessing()
-    #profile.quality_metrics()
+    profile.quality_metrics()
 
 def profile_to_mat(session, protocol=None):
     profile_cls = get_recording_profile(session, 0)

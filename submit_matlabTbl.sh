@@ -39,7 +39,7 @@ echo "======================================================"
 #################################################################
 ################### RUN SI to get PROFILE #######################
 
-echo "Running matlab pipeline........................"
+echo "Retrieving protocol path........................"
 SORTER_PATH=$($CONDA_PREFIX/bin/python -c "
 from main_pipeline import profile_to_mat
 
@@ -48,7 +48,6 @@ print(profile_to_mat(
     protocol='${PROTOCOL}' 
 ))
 ")
-
 
 echo "SORTER_PATH    =  '$SORTER_PATH'"
 echo "======================================================"
@@ -60,6 +59,7 @@ RAW_PATH=$(python -c "import config; print(config.RAW_DATA_PATH)")
 OUT_PATH=$(python -c "import config; print(config.RAW_DATA_PATH)")
 NEV_PATH=$(python -c "import config; print(config.NEVUTIL_PATH)")
 
+echo "Running matlab pipeline........................"
 matlab -nodisplay <<EOF
 try
     addpath(genpath('matlab'));   % add the subdirectory to path
