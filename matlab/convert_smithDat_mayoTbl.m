@@ -86,7 +86,7 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
         ];
 
         % Apply the function to each cell in conditions
-        conditions = cellfun(@(q) round(pix2deg(q, tbl1(1,:).params.block.screenDistance, tbl1(1,:).params.block.pixPerCM)), cellfun(process_string, tbl1.text, 'uni', 0), 'uni', 0);
+        conditions = cellfun(@(q) pix2deg(q, tbl1(1,:).params.block.screenDistance, tbl1(1,:).params.block.pixPerCM), cellfun(process_string, tbl1.text, 'uni', 0), 'uni', 0);
         tbl.conditions = cellfun(@(q) num2cell(q,2), conditions, 'uni', 0);
 
     else
@@ -162,13 +162,13 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
     end
 
     tbl.params = tbl1.params;
+    tbl.eyedata = tbl1.eyedata; tbl.pupil = tbl1.pupil; tbl.diode = tbl1.diode;
 
-    eyePos = cellfun(@(x,y) filterEyeTraces_EyeLink(x(:,y:end),'SAMPLING_FREQUENCY',1000,'CUTOFF_FREQUENCY',84,'PLOT_TRIAL',false), tbl1.eyedata, trialStarts, 'uni', 0);
-    eyeVel = cellfun(@(q) calcDerivative_eyeTraces(q), cellfun(@(x,y) filterEyeTraces_EyeLink(x(:,y:end),'SAMPLING_FREQUENCY',1000,'CUTOFF_FREQUENCY',40,'PLOT_TRIAL',false), tbl1.eyedata, trialStarts, 'uni', 0), 'uni', 0);
-    eyeAcc = cellfun(@(q) calcDerivative_eyeTraces(q), eyeVel, 'uni', 0);
+    % eyePos = cellfun(@(x,y) filterEyeTraces_EyeLink(x(:,y:end),'SAMPLING_FREQUENCY',1000,'CUTOFF_FREQUENCY',84,'PLOT_TRIAL',false), tbl1.eyedata, trialStarts, 'uni', 0);
+    % eyeVel = cellfun(@(q) calcDerivative_eyeTraces(q), cellfun(@(x,y) filterEyeTraces_EyeLink(x(:,y:end),'SAMPLING_FREQUENCY',1000,'CUTOFF_FREQUENCY',40,'PLOT_TRIAL',false), tbl1.eyedata, trialStarts, 'uni', 0), 'uni', 0);
+    % eyeAcc = cellfun(@(q) calcDerivative_eyeTraces(q), eyeVel, 'uni', 0);
 
-    tbl.eyePos = eyePos; tbl.eyeVel = eyeVel; tbl.eyeAcc = eyeAcc;
-    tbl.pupil = tbl1.pupil; tbl.diode = tbl1.diode; tbl.eyePos_raw = eyePos;
+    % tbl.eyePos = eyePos; tbl.eyeVel = eyeVel; tbl.eyeAcc = eyeAcc;
 
     if ismember('spiketimes', tbl1.Properties.VariableNames)
         tbl.spiketimes = tbl1.spiketimes; 
@@ -265,7 +265,7 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
             tbl.FIX_OFF = num2cell(tbl.FIX_OFF);
         end
 
-        tbl.saccLatency = tbl.SACCADE-cellfun(@(q) q(1), tbl.FIX_OFF);
+        % tbl.saccLatency = tbl.SACCADE-cellfun(@(q) q(1), tbl.FIX_OFF);
              
 
     elseif any(contains(TASK_NAME, {'purs','pursuit'}))
@@ -293,29 +293,29 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
             tbl = movevars(tbl,{'jump'},'Before','fixDuration');
         end
 
-        [pursuitOnsets,rxnTimes,msOffsets,csOnsets,csVelocities,csPeaks,csOffsets,csAngles,crossingTimes] = deal(nan(height(tbl), 1));
-        csTypes = cell(height(tbl),1);
-        for t = 1:height(tbl)
-            if isequal(tbl.result(t),"CORRECT")
-                
-                if isfield(tbl(1,:).params.block,'crossingTime')
-                    [pursuit_onset,rxnTime,msOffset,csOnset,csVelocity,csPeak,csOffset,csAngle,csType] = detect_pursuitOnset(tbl.eyePos{t},tbl.eyeVel{t},tbl.PURSUIT_TARG_ON(t),tbl(t,:).params.block.crossingTime,tbl.pursuitSpeed(t),tbl.angle(t),'PLOT_TRACES',false);
-                else
-                    [pursuit_onset,rxnTime,msOffset,csOnset,csVelocity,csPeak,csOffset,csAngle,csType] = detect_pursuitOnset(tbl.eyePos{t},tbl.eyeVel{t},tbl.PURSUIT_TARG_ON(t),110,tbl.pursuitSpeed(t),tbl.angle(t),'PLOT_TRACES',false);
-                end
-                pursuitOnsets(t) = pursuit_onset; rxnTimes(t) = rxnTime; msOffsets(t) = msOffset; csOnsets(t) = csOnset; csVelocities(t) = csVelocity; csPeaks(t) = csPeak; csOffsets(t) = csOffset; csAngles(t) = csAngle; csTypes{t} = csType;
-            else
-                csTypes{t} = 'NaN';
-            end
+        % [pursuitOnsets,rxnTimes,msOffsets,csOnsets,csVelocities,csPeaks,csOffsets,csAngles,crossingTimes] = deal(nan(height(tbl), 1));
+        % csTypes = cell(height(tbl),1);
+        % for t = 1:height(tbl)
+        %     if isequal(tbl.result(t),"CORRECT")
+        % 
+        %         if isfield(tbl(1,:).params.block,'crossingTime')
+        %             [pursuit_onset,rxnTime,msOffset,csOnset,csVelocity,csPeak,csOffset,csAngle,csType] = detect_pursuitOnset(tbl.eyePos{t},tbl.eyeVel{t},tbl.PURSUIT_TARG_ON(t),tbl(t,:).params.block.crossingTime,tbl.pursuitSpeed(t),tbl.angle(t),'PLOT_TRACES',false);
+        %         else
+        %             [pursuit_onset,rxnTime,msOffset,csOnset,csVelocity,csPeak,csOffset,csAngle,csType] = detect_pursuitOnset(tbl.eyePos{t},tbl.eyeVel{t},tbl.PURSUIT_TARG_ON(t),110,tbl.pursuitSpeed(t),tbl.angle(t),'PLOT_TRACES',false);
+        %         end
+        %         pursuitOnsets(t) = pursuit_onset; rxnTimes(t) = rxnTime; msOffsets(t) = msOffset; csOnsets(t) = csOnset; csVelocities(t) = csVelocity; csPeaks(t) = csPeak; csOffsets(t) = csOffset; csAngles(t) = csAngle; csTypes{t} = csType;
+        %     else
+        %         csTypes{t} = 'NaN';
+        %     end
+        % 
+        % end
 
-        end
-
-        tbl.pursuitOnset = pursuitOnsets; tbl.pursuitLatency = rxnTimes;
-        tbl.msOffset = msOffsets; tbl.CROSSING_TIME = crossingTimes;
-        tbl.csTimes = [csOnsets, csPeaks, csOffsets]; tbl.csVelocity = csVelocities; tbl.csAngle = csAngles;
-        tbl.pursType = csTypes; tbl.pursType = categorical(string(tbl.pursType));
-        
-        tbl = movevars(tbl,{'pursuitOnset','pursuitLatency','msOffset','pursType','csTimes','csVelocity','csAngle'},'Before','result');
+        % tbl.pursuitOnset = pursuitOnsets; tbl.pursuitLatency = rxnTimes;
+        % tbl.msOffset = msOffsets; tbl.CROSSING_TIME = crossingTimes;
+        % tbl.csTimes = [csOnsets, csPeaks, csOffsets]; tbl.csVelocity = csVelocities; tbl.csAngle = csAngles;
+        % tbl.pursType = csTypes; tbl.pursType = categorical(string(tbl.pursType));
+        % 
+        % tbl = movevars(tbl,{'pursuitOnset','pursuitLatency','msOffset','pursType','csTimes','csVelocity','csAngle'},'Before','result');
         tbl = movevars(tbl,{'CROSSING_TIME'},'After','PURSUIT_TARG_ON');
 
     % elseif any(contains(TASK_NAME, {'rfmp','rfMapping'})) && ismember('STIM_ON', tbl.Properties.VariableNames)
