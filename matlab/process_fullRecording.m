@@ -18,7 +18,6 @@ function process_fullRecording(session_name,varargin)
     addParameter(p, 'NEVUTIL_PATH', defaultNEV_PATH, @ischar);
     addParameter(p, 'NASNET_PATH', defaultNET_PATH, @ischar); % only used for plex
     addParameter(p, 'SORTER_PATH', [], @ischar);
-    addParameter(p, 'PROTOCOL_PATH', [], @ischar);
     
     % Parse inputs
     parse(p, session_name, varargin{:});
@@ -27,7 +26,6 @@ function process_fullRecording(session_name,varargin)
     NEV_PATH       =  p.Results.NEVUTIL_PATH;
     NET_PATH       =  p.Results.NASNET_PATH;
     SORTER_PATH    =  p.Results.SORTER_PATH;
-    PROTOCOL_PATH  =  p.Results.PROTOCOL_PATH;
 
     addpath(genpath(NEV_PATH));
 
@@ -52,12 +50,6 @@ function process_fullRecording(session_name,varargin)
         S1.sess_name = metadata.sess_name;
     else
         S1.sess_name = session_name;
-    end
-
-    if isfile(PROTOCOL_PATH)
-        jsonStr = fileread(PROTOCOL_PATH);
-        protocolStruct = jsondecode(jsonStr);
-        S1.protocol = protocolStruct;
     end
 
     % Create the search pattern to find files that start with 'filename' and end with '.ns5'
@@ -248,6 +240,7 @@ function process_fullRecording(session_name,varargin)
                         trlAvg_frs_all{probe} = trlAvg_frs;
                         
                         if nevnum==1
+
                             kilosort.probe_index = probe;
                             fields = fieldnames(kilosort);
                             fields(strcmp(fields, 'probe_index')) = [];
@@ -272,6 +265,9 @@ function process_fullRecording(session_name,varargin)
                             kilosort_all = [kilosort_all; kilosort];
 
                             if probe==numel(imec_dirs)
+                                jsonStr = fileread(fullfile(kilosort4_path,'params.json'));
+                                protocolStruct = jsondecode(jsonStr);
+                                S1.protocol = protocolStruct;
                                 S1.kilosort = kilosort_all;
                             end
                         end
@@ -312,7 +308,7 @@ function process_fullRecording(session_name,varargin)
 
     % Re-order fields of struct 
     ff = fieldnames(S1);
-    newOrder = ff(ismember(ff, {'sess_name', 'metadata'}));
+    newOrder = ff(ismember(ff, {'sess_name', 'metadata', 'protocol'}));
     if ismember('kilosort', ff)
         newOrder = [newOrder; 'kilosort'];
     end
