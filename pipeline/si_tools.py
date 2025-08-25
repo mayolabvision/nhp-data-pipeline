@@ -125,8 +125,10 @@ def add_extension_arrays_to_metrics(extensions_path: Path, metrics: pd.DataFrame
     """
     n_rows = metrics.shape[0]
 
+    skip_dirs = {"templates", "correlograms", "principal_components"}
+
     for ext_dir in extensions_path.iterdir():
-        if ext_dir.is_dir():
+        if ext_dir.is_dir() and ext_dir.name not in skip_dirs:
             for npy_file in ext_dir.glob("*.npy"):
                 data = np.load(npy_file, allow_pickle=True)
 
@@ -141,3 +143,4 @@ def add_extension_arrays_to_metrics(extensions_path: Path, metrics: pd.DataFrame
                         metrics[col_name] = data
 
     return metrics
+
