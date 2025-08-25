@@ -22,6 +22,7 @@ source activate "$ENV_PATH"
 RAW_DATA_PATH=$(python -c "import config; print(config.RAW_DATA_PATH)")
 OUT_DATA_PATH=$(python -c "import config; print(config.RAW_DATA_PATH)")
 NEV_PATH=$(python -c "import config; print(config.NEVUTIL_PATH)")
+PROTOCOLS_PATH=$(python -c "import config; print(config.PROTOCOLS_PATH)")
 
 # ----- Specify inputs -----
 echo "======================================================"
@@ -58,6 +59,7 @@ echo "======================================================"
 RAW_PATH=$(python -c "import config; print(config.RAW_DATA_PATH)")
 OUT_PATH=$(python -c "import config; print(config.RAW_DATA_PATH)")
 NEV_PATH=$(python -c "import config; print(config.NEVUTIL_PATH)")
+PROTOCOL_PATH="${PROTOCOLS_PATH}/${PROTOCOL}"
 
 echo "Running matlab pipeline........................"
 matlab -nodisplay <<EOF
@@ -68,7 +70,8 @@ try
         'RAW_DATA_PATH', '$RAW_PATH', ...
         'OUT_DATA_PATH', '$OUT_PATH', ...
         'NEVUTIL_PATH', '$NEV_PATH', ...
-        'SORTER_PATH', '$SORTER_PATH');
+        'SORTER_PATH', '$SORTER_PATH', ...
+        'PROTOCOL_PATH', '$PROTOCOL_PATH');
 catch err
     disp('ERROR in process_fullRecording:');
     disp(getReport(err));
