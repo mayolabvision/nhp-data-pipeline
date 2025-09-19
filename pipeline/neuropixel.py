@@ -14,79 +14,92 @@ from config import RAW_DATA_PATH
 from .catgt_utils import run_catgt
 from .SGLXMetaToCoords import MetaToCoords
 from .path_utils import get_preprocess_hash, get_motion_hash, save_params, get_sorter_hash
-from .si_tools import run_preprocessing_with_motion_correction, run_preprocessing_without_motion_correction, save_processed_recording
+from .si_tools import run_preprocessing_with_motion_correction, run_preprocessing_without_motion_correction, save_processed_recording, detect_excessive_motion
 from .si_tools import find_missing_extensions, add_extension_arrays_to_metrics
+from .si_plots import plot_motion_screening, plot_preprocessing_steps, plot_probe_peaks, plot_noise_levels, plot_motion_correction_traces
 from .ks_tools import convert_npy_to_mat, get_best_channels
 
 from spikeinterface.sorters import run_sorter
-from spikeinterface.core import load
+from spikeinterface.core import load, BaseRecording
 from spikeinterface import create_sorting_analyzer, load_sorting_analyzer
+from spikeinterface.extractors import get_neo_streams, read_spikeglx
 from spikeinterface.qualitymetrics import compute_quality_metrics
 
 class NeuropixelProfile(RecordingProfile):
     def prep_session_data(self):
-        # 1. Set raw data path
         self.data_path = Path(RAW_DATA_PATH) / self.session / f"{self.session}_imec{self.probe_id}"
-        if not self.data_path.is_dir():
-            raise FileNotFoundError(f"Raw data directory not found: {self.data_path}")
-        #print(f"✓ Raw data found: {self.data_path}")
 
-        # 2. Run CatGT if needed, pulls out imec sync pulses
         run_catgt(self.session, Path(RAW_DATA_PATH))
-
-        #### 3. Set up paths to each part of pipeline ####
-        # A. Make probe map
         self.probe_path = self.data_path / f"{self.session}_t0.imec{self.probe_id}.ap_kilosortChanMap.mat"
         
-        # B. Preprocessing
-        self.preprocess_hash = get_preprocess_hash(self.protocol['preprocessing'])    
-        if self.protocol.get('motion_correction'):
-            self.pp_hash, self.motion_hash, self.motion_params = get_motion_hash(self.protocol['motion_correction'])
-            self.preprocess_path = self.data_path / "preprocess" / self.preprocess_hash / self.pp_hash / self.motion_hash
-        else:
-            self.preprocess_path = self.data_path / "preprocess" / self.preprocess_hash / "nodrift"
-            self.motion_hash = "nodrift"           
-
-        # C. Spike sorting
+        self.preprocess_hash = get_preprocess_hash(self.protocol["motion_screening"] | self.protocol["preprocessing"])    
+        self.pp_hash, self.motion_hash, self.pp_params, self.motion_params = get_motion_hash(self.protocol['motion_correction'])
+        self.preprocess_path = self.data_path / "preprocess" / self.preprocess_hash / self.pp_hash / self.motion_hash
+        save_params(self.preprocess_path.parent.parent / "params.json", self.protocol['preprocessing'])
+        save_params(self.preprocess_path.parent / "params.json", self.pp_params)
+        
         self.sorter_hash, self.sorter_params, _ = get_sorter_hash(self.protocol['sorting'])
         self.full_hash = "-".join([self.preprocess_hash, self.motion_hash, self.sorter_hash])
         self.sorter_path = self.data_path / "sorting" / self.full_hash
  
-        # D. Postprocessing
         self.analyzer_path = self.sorter_path / 'analyzer'
-
-        # E. Quality metrics
         self.metrics_path = self.sorter_path / 'quality_metrics'
+        
+        self.tbl_path = self.data_path.parent / "tables" / f"{self.session}-{self.full_hash}.mat"
+        self.figs_path = self.data_path.parent / "figs" / self.full_hash / f"{self.metadata['hardware_config'][self.probe_id]}_{self.metadata['probe_label'][self.probe_id]}"
+        save_params(self.figs_path / "params.json", self.protocol)
 
     def make_probe_map(self):
         if not self.probe_path.exists():
             MetaToCoords(self.probe_path.parent / f"{self.session}_t0.imec{self.probe_id}.ap.meta",
                          1, badChan=np.zeros((0), dtype='int'), destFullPath='', showPlot=True)
-            #print(f"✓ Probe map made: {self.probe_path}")
-        #else:
-            #print(f"Probe map already exists, skipping make_probe_map")
+    
+    def motion_screening(self):
+        if self.protocol["motion_screening"]["enabled"]:
+            stream_names, stream_ids = get_neo_streams('spikeglx', self.data_path)
+            raw_recording = read_spikeglx(self.data_path, stream_name=f'imec{self.probe_id}.ap', load_sync_channel=False)
+            
+            cutoff_time_sec = detect_excessive_motion(raw_recording, self.preprocess_path, 
+                                                      threshold_um=self.protocol['motion_screening']['motion_thresh_um'],
+                                                      min_duration_sec=self.protocol['motion_screening']['min_duration_sec'])
+            self.cutoff_frame = None if cutoff_time_sec is None else int(cutoff_time_sec * raw_recording.get_sampling_frequency())
+
+            if not (self.figs_path / "motion_screening.png").is_file():             
+                plot_motion_screening(self, cutoff_time_sec)
+                print(f"===== motion screening plotted =====")
+        else:
+            self.cutoff_frame = None
 
     def preprocessing(self):
-        save_params(self.data_path / "preprocess" / self.preprocess_hash / "params.json",
-                    self.protocol['preprocessing'])
-        
-        if not (self.preprocess_path / 'output' / 'traces_cached_seg0.raw').is_file(): 
-            if self.protocol.get('motion_correction'):
-                mc_recording = run_preprocessing_with_motion_correction(self.data_path, self.probe_id, self.protocol, self.preprocess_path)
-                mc_recording = save_processed_recording(mc_recording, self.preprocess_path / 'output')
-                
-                save_params(self.data_path / "preprocess" / self.preprocess_hash / self.pp_hash / "params.json",
-                            self.protocol['motion_correction']['preprocessing'])
-                save_params(self.data_path / "preprocess" / self.preprocess_hash / self.pp_hash / self.motion_hash / "params.json",
-                            self.motion_params)
+        if not (self.preprocess_path / 'params.json').is_file(): 
+            stream_names, stream_ids = get_neo_streams('spikeglx', self.data_path)
+            raw_recording = read_spikeglx(self.data_path, stream_name=f'imec{self.probe_id}.ap', load_sync_channel=False)
+           
+            print("Duration of raw recording (min):", round((raw_recording.get_num_samples(segment_index=0)/raw_recording.get_sampling_frequency())/60))
+            trim_recording = raw_recording.frame_slice(start_frame=0, end_frame=self.cutoff_frame)
+            print("Duration of trimmed recording (min):", round((trim_recording.get_num_samples(segment_index=0)/trim_recording.get_sampling_frequency())/60))
+     
+            plot_noise_levels(trim_recording,self)
+            print(f"===== distributions of noise_levels plotted =====")
+            plot_preprocessing_steps(trim_recording,self)
+            print(f"===== traces for preprocessing_steps plotted =====")
             
-                print(f"✓ Preprocessed data w/ drift correction saved: {self.preprocess_path}")
-            else:
-                mc_recording = run_preprocessing_without_motion_correction(self.data_path, self.probe_id, self.protocol, self.preprocess_path)
-                mc_recording = save_processed_recording(mc_recording, self.preprocess_path / 'output')
+            if self.protocol.get('motion_correction'):
+                mc_recording = run_preprocessing_with_motion_correction(trim_recording, self.protocol, self.preprocess_path)
+                print(f"===== preprocessing with motion correction complete =====")
                 
-                print(f"✓ Preprocessed data w/out drift correction saved: {self.preprocess_path}")
-
+                plot_probe_peaks(trim_recording,self)
+                print(f"===== activity peaks on probe plotted =====")
+                plot_motion_correction_traces(trim_recording,self)    
+                print(f"===== motion-corrected traces plotted =====")
+                
+            else:
+                mc_recording = run_preprocessing_without_motion_correction(trim_recording, self.protocol, self.preprocess_path)
+                
+            mc_recording = save_processed_recording(mc_recording, self.preprocess_path / 'output')
+            save_params(self.preprocess_path / "params.json", self.motion_params)
+            
+            print(f"✓ Preprocessed data saved: {self.preprocess_path}") 
         else:
             print("Preprocessed data already exists, skipping save_preprocessed_recording")
 

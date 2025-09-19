@@ -5,7 +5,7 @@
 #SBATCH --partition=high-mem
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
-#SBATCH --job-name=pipe-preproc
+#SBATCH --job-name=preproc
 #SBATCH --error=/ix1/pmayo/outfiles/out_%A_%a.out
 #SBATCH --output=/ix1/pmayo/outfiles/out_%A_%a.out
 #SBATCH --mail-type=done,fail
@@ -14,7 +14,7 @@
 
 # ----- Load environment -----
 module purge
-module load python/ondemand-jupyter-python3.9
+module load python/ondemand-jupyter-python3.11
 
 ENV_PATH=$(python -c "import config; print(config.ENV_PATH)")
 source activate "$ENV_PATH"
@@ -24,9 +24,9 @@ echo "======================================================"
 
 SESSION="${1}"
 PROBE_ID=$SLURM_ARRAY_TASK_ID
-PROTOCOL="np_medicine.json"
+PROTOCOL="${2:-np-nodrift-ks4_wr12.json}"
 
-echo "SESSION    =  '$SESSION'"
+echo "SESSION    =  $SESSION"
 echo "PROBE_ID   =  $PROBE_ID"
 echo "PROTOCOL   =  $PROTOCOL"
 
