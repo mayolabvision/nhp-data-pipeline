@@ -316,7 +316,7 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
         % tbl.pursType = csTypes; tbl.pursType = categorical(string(tbl.pursType));
         % 
         % tbl = movevars(tbl,{'pursuitOnset','pursuitLatency','msOffset','pursType','csTimes','csVelocity','csAngle'},'Before','result');
-        tbl = movevars(tbl,{'CROSSING_TIME'},'After','PURSUIT_TARG_ON');
+        %tbl = movevars(tbl,{'CROSSING_TIME'},'After','PURSUIT_TARG_ON');
 
     % elseif any(contains(TASK_NAME, {'rfmp','rfMapping'})) && ismember('STIM_ON', tbl.Properties.VariableNames)
     %     tbl.STIM_ON(tbl.result~='CORRECT') = cellfun(@(q) q(1:end-1), tbl.STIM_ON(tbl.result~='CORRECT'), 'uni', 0);
