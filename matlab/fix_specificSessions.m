@@ -22,6 +22,7 @@ function [dat_new,these_alignTimes,goodFlag_new] = fix_specificSessions(session_
                 good_alignTimes2 = remaining_alignTimes(1:696);
     
                 these_alignTimes = [good_alignTimes1; good_alignTimes2];
+                dat_new = dat;
                 dat_new(772:869) = [];
     
                 goodFlag_new = false;

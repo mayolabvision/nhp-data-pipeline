@@ -8,6 +8,7 @@ function ia_rfMaps(data,varargin)
     addParameter(p, 'JOB_ID', NaN, @isnumeric);
     addParameter(p, 'N_CHUNKS', NaN, @isnumeric);
     addParameter(p, 'CLUSTER', [], @isnumeric);
+    addParameter(p, 'SAVE_PDF', false, @islogical);
     
     parse(p, data, varargin{:});
     data = p.Results.data;
@@ -16,6 +17,7 @@ function ia_rfMaps(data,varargin)
     JOB_ID = p.Results.JOB_ID;
     N_CHUNKS = p.Results.N_CHUNKS;
     CLUSTER = p.Results.CLUSTER;
+    SAVE_PDF = p.Results.SAVE_PDF;
 
     fprintf('\n------------------------------\n')
     if ischar(data)
@@ -188,7 +190,11 @@ function ia_rfMaps(data,varargin)
 
                     
                     if ~isempty(FIG_PATH)
-                        print(f2a, fullfile(FIG_PATH2, sprintf('%s_clust%04d_chan%03d.png', probe_label, unit, chans(u))), '-dpng', '-r200');
+                        if SAVE_PDF
+                            savebigPDF(f2a, fullfile(FIG_PATH2, sprintf('%s_clust%04d_chan%03d.png', probe_label, unit, chans(u))));
+                        else
+                            print(f2a, fullfile(FIG_PATH2, sprintf('%s_clust%04d_chan%03d.png', probe_label, unit, chans(u))), '-dpng', '-r200');
+                        end
                     end
                     fprintf(sprintf('\n----PROBE %d, Unit %.4d COMPLETE----',PROBE_INDEX, unit))
                 else

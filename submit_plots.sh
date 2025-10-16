@@ -1,6 +1,6 @@
 #!/bin/bash -l
 #SBATCH --cluster=smp
-#SBATCH --partition=smp
+#SBATCH --partition=high-mem
 #SBATCH --job-name=plots
 #SBATCH --error=/ix1/pmayo/outfiles/out_%A_%a.out 
 #SBATCH --output=/ix1/pmayo/outfiles/out_%A_%a.out
@@ -31,12 +31,12 @@ HELPERS_PATH=$(python -c "import config; print(config.HELPERS_PATH)")
 echo "======================================================"
 
 SESSION="${1}"
-PROTOCOL="${2}"
-PROBE="${3:-1}"
+PROTOCOL="${2:-np-nodrift-ks4_wr12.json}"
+PROBE_ID="${3:-1}"
 
 echo "SESSION    =  $SESSION"
 echo "PROTOCOL   =  $PROTOCOL"
-echo "PROBE      =  $PROBE"
+echo "PROBE_ID   =  $PROBE_ID"
 
 echo "======================================================"
 
@@ -65,23 +65,128 @@ echo "======================================================"
 
 ########################
 
-echo "Retrieving RF Maps per cluster........................"
+echo "Plotting RF Maps per cluster........................"
 matlab -nodisplay <<EOF
-try
-    addpath(genpath('matlab'));
-    addpath(genpath('$HELPERS_PATH'));
-    fprintf('Running ia_rfMaps for $1\n');
-    ia_rfMaps('$DATA_PATH', ...
-        'PROBE_INDEX', $PROBE, ...
-        'FIG_PATH', '$FIG_PATH', ...
-        'JOB_ID', str2double(getenv('SLURM_ARRAY_TASK_ID')),...
-        'N_CHUNKS', str2double(getenv('SLURM_ARRAY_TASK_COUNT')));
-catch err
-    disp('ERROR in ia_rfMaps:');
-    disp(getReport(err));
-    exit(1);
-end
+addpath(genpath('matlab'));
+addpath(genpath('$HELPERS_PATH/plotting'));
+fprintf('Running ia_rfMaps for $1\n');
+ia_rfMaps('$DATA_PATH', ...
+    'PROBE_INDEX', $PROBE_ID, ...
+    'FIG_PATH', '$FIG_PATH', ...
+    'JOB_ID', str2double(getenv('SLURM_ARRAY_TASK_ID')),...
+    'N_CHUNKS', str2double(getenv('SLURM_ARRAY_TASK_COUNT')));
 exit
 EOF
 
+########################
+
+echo "Plotting MDIR rasters per cluster........................"
+ALIGN="stim"
+echo "ALIGN: $ALIGN"
+# First MATLAB call: run process_NeuropixRecording_KKN
+matlab -nodisplay <<EOF
+addpath(genpath('matlab'));
+addpath(genpath('$HELPERS_PATH/plotting'));
+fprintf('Running ia_mdirRasters for $1\n');
+ia_mdirRasters('$DATA_PATH', ...
+    'PROBE_INDEX', $PROBE_ID, ...
+    'ALIGN', '$ALIGN', ...
+    'FIG_PATH', '$FIG_PATH', ...
+    'JOB_ID', str2double(getenv('SLURM_ARRAY_TASK_ID')), ...
+    'N_CHUNKS', str2double(getenv('SLURM_ARRAY_TASK_COUNT')));
+exit
+EOF
+
+ALIGN="sacc"
+echo "ALIGN: $ALIGN"
+# First MATLAB call: run process_NeuropixRecording_KKN
+matlab -nodisplay <<EOF
+addpath(genpath('matlab'));
+addpath(genpath('$HELPERS_PATH/plotting'));
+fprintf('Running ia_mdirRasters for $1\n');
+ia_mdirRasters('$DATA_PATH', ...
+    'PROBE_INDEX', $PROBE_ID, ...
+    'ALIGN', '$ALIGN', ...
+    'FIG_PATH', '$FIG_PATH', ...
+    'JOB_ID', str2double(getenv('SLURM_ARRAY_TASK_ID')), ...
+    'N_CHUNKS', str2double(getenv('SLURM_ARRAY_TASK_COUNT')));
+exit
+EOF
+
+########################
+
+echo "Plotting PURS rasters per cluster........................"
+ALIGN="targ"
+PURE_ONLY="0"
+echo "ALL TRIALS, ALIGNED TO TARG"
+matlab -nodisplay <<EOF
+addpath(genpath('matlab'));
+addpath(genpath('$HELPERS_PATH/plotting'));
+addpath(genpath('$HELPERS_PATH/behavior'));
+fprintf('Running ia_pursRasters for $1\n');
+ia_pursRasters('$DATA_PATH', ...
+    'PROBE_INDEX', $PROBE_ID, ...
+    'ALIGN', '$ALIGN', ...
+    'PURE_ONLY', logical(str2double('$PURE_ONLY')), ...
+    'FIG_PATH', '$FIG_PATH', ...
+    'JOB_ID', str2double(getenv('SLURM_ARRAY_TASK_ID')), ...
+    'N_CHUNKS', str2double(getenv('SLURM_ARRAY_TASK_COUNT')));
+exit
+EOF
+
+ALIGN="purs"
+PURE_ONLY="0"
+echo "ALL TRIALS, ALIGNED TO PURS"
+matlab -nodisplay <<EOF
+addpath(genpath('matlab'));
+addpath(genpath('$HELPERS_PATH/plotting'));
+addpath(genpath('$HELPERS_PATH/behavior'));
+fprintf('Running ia_pursRasters for $1\n');
+ia_pursRasters('$DATA_PATH', ...
+    'PROBE_INDEX', $PROBE_ID, ...
+    'ALIGN', '$ALIGN', ...
+    'PURE_ONLY', logical(str2double('$PURE_ONLY')), ...
+    'FIG_PATH', '$FIG_PATH', ...
+    'JOB_ID', str2double(getenv('SLURM_ARRAY_TASK_ID')), ...
+    'N_CHUNKS', str2double(getenv('SLURM_ARRAY_TASK_COUNT')));
+exit
+EOF
+
+ALIGN="targ"
+PURE_ONLY="1"
+echo "PURE ONLY, ALIGNED TO TARG"
+matlab -nodisplay <<EOF
+addpath(genpath('matlab'));
+addpath(genpath('$HELPERS_PATH/plotting'));
+addpath(genpath('$HELPERS_PATH/behavior'));
+fprintf('Running ia_pursRasters for $1\n');
+ia_pursRasters('$DATA_PATH', ...
+    'PROBE_INDEX', $PROBE_ID, ...
+    'ALIGN', '$ALIGN', ...
+    'PURE_ONLY', logical(str2double('$PURE_ONLY')), ...
+    'FIG_PATH', '$FIG_PATH', ...
+    'JOB_ID', str2double(getenv('SLURM_ARRAY_TASK_ID')), ...
+    'N_CHUNKS', str2double(getenv('SLURM_ARRAY_TASK_COUNT')));
+exit
+EOF
+
+ALIGN="purs"
+PURE_ONLY="1"
+echo "PURE ONLY, ALIGNED TO PURS"
+matlab -nodisplay <<EOF
+addpath(genpath('matlab'));
+addpath(genpath('$HELPERS_PATH/plotting'));
+addpath(genpath('$HELPERS_PATH/behavior'));
+fprintf('Running ia_pursRasters for $1\n');
+ia_pursRasters('$DATA_PATH', ...
+    'PROBE_INDEX', $PROBE_ID, ...
+    'ALIGN', '$ALIGN', ...
+    'PURE_ONLY', logical(str2double('$PURE_ONLY')), ...
+    'FIG_PATH', '$FIG_PATH', ...
+    'JOB_ID', str2double(getenv('SLURM_ARRAY_TASK_ID')), ...
+    'N_CHUNKS', str2double(getenv('SLURM_ARRAY_TASK_COUNT')));
+exit
+EOF
+
+####################################################################
 echo "DONE"

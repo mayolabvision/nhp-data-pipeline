@@ -23,8 +23,9 @@ source activate "$ENV_PATH"
 echo "======================================================"
 
 SESSION="${1}"
-PROBE_ID=$SLURM_ARRAY_TASK_ID
 PROTOCOL="${2:-np-nodrift-ks4_wr12.json}"
+
+PROBE_ID=$SLURM_ARRAY_TASK_ID
 
 echo "SESSION    =  $SESSION"
 echo "PROBE_ID   =  $PROBE_ID"
