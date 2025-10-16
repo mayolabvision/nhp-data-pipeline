@@ -1,7 +1,5 @@
 function [dat_new,these_alignTimes,goodFlag_new] = fix_specificSessions(session_name,np_mask,ripple_mask,alignTimes,dat,goodFlag)
-%UNTITLED Summary of this function goes here
-%   Detailed explanation goes here
-    if isequal(session_name,'kendra_scrappy_0136a_g0') 
+    if contains(session_name,'kendra_scrappy_0136a') 
         if goodFlag % only used for kendra_scrappy_0136a_g0
             if sum(np_mask) >= numel(ripple_mask)
                 these_alignTimes = alignTimes(np_mask);
@@ -10,7 +8,10 @@ function [dat_new,these_alignTimes,goodFlag_new] = fix_specificSessions(session_
                 if numel(ripple_mask) ~= sum(ripple_mask)
                     dat_new = dat(ripple_mask);
                     fprintf('\n dat has %d rows', numel(dat_new))
+                else
+                    dat_new = dat;
                 end
+            
             elseif sum(np_mask) < numel(ripple_mask) % only used for kendra_scrappy_0136a_g0
                 first_block_start = find(np_mask, 1, 'first');
                 first_block_end = first_block_start + find(~np_mask(first_block_start:end), 1, 'first') - 2;
@@ -21,12 +22,15 @@ function [dat_new,these_alignTimes,goodFlag_new] = fix_specificSessions(session_
                 good_alignTimes2 = remaining_alignTimes(1:696);
     
                 these_alignTimes = [good_alignTimes1; good_alignTimes2];
+                dat_new = dat;
                 dat_new(772:869) = [];
     
                 goodFlag_new = false;
             end
         else
             these_alignTimes = alignTimes(end-313:end);
+            goodFlag_new = goodFlag;
+            dat_new = dat;
         end
     end
 end

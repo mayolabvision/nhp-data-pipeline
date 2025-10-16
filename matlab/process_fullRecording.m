@@ -144,7 +144,7 @@ function process_fullRecording(session_name,varargin)
             fprintf('\n dat has %d rows\n', numel(dat))
             fprintf('np_mask = %d/%d, ripple_mask = %d/%d \n', sum(np_mask), length(np_mask), sum(ripple_mask), length(ripple_mask))  
    
-            if isequal(session_name,'kendra_scrappy_0136a_g0') 
+            if contains(session_name, 'kendra_scrappy_0136a') 
                 [dat,these_alignTimes,goodFlag] = fix_specificSessions(session_name,np_mask,ripple_mask,alignTimes,dat,goodFlag);
             else
                 these_alignTimes = alignTimes(np_mask);
@@ -225,7 +225,7 @@ function process_fullRecording(session_name,varargin)
         S1.(this_task).hdr = out_ns5.hdr;
 
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% KILOSORT/NEUROPIXELS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        imec_dirs = {'/Volumes/SHARED_STUFF/lab_NHPdata-processed/kendra_scrappy_0161a_g0/kendra_scrappy_0161a_g0_imec0';'/Volumes/SHARED_STUFF/lab_NHPdata-processed/kendra_scrappy_0161a_g0/kendra_scrappy_0161a_g0_imec1'};
+        %imec_dirs = {'/Volumes/SHARED_STUFF/lab_NHPdata-processed/kendra_scrappy_0161a_g0/kendra_scrappy_0161a_g0_imec0';'/Volumes/SHARED_STUFF/lab_NHPdata-processed/kendra_scrappy_0161a_g0/kendra_scrappy_0161a_g0_imec1'};
         if SORTER_PATH
             kilosort_all = []; 
             if ismember('neuropixel',metadata.probe_type)
@@ -234,46 +234,41 @@ function process_fullRecording(session_name,varargin)
                     %kilosort4_path = fullfile(imec_dirs{imec}, ['kilosort4_', RUN_TYPE]);
                     kilosort4_path = fullfile(imec_dirs{probe}, 'sorting', SORTER_PATH);
     
-                    if isfolder(kilosort4_path)
-                        [spikes_perTrial,kilosort,trlAvg_frs] = parse_KilosortToTbl(tbl,fullfile(kilosort4_path,'sorter_output'),'NP_ALIGN_PULSES',these_alignTimes,'Fs',S1.metadata.ap_meta(probe).imSampRate);
-                        tbl.(sprintf('spiketimes_%d',probe)) = spikes_perTrial;
-                        trlAvg_frs_all{probe} = trlAvg_frs;
-                        
-                        if nevnum==1
-
-                            kilosort.probe_index = probe;
-                            fields = fieldnames(kilosort);
-                            fields(strcmp(fields, 'probe_index')) = [];
-                            kilosort = orderfields(kilosort, ['probe_index'; fields]);
-        
-                            if isfile(fullfile(kilosort4_path,'quality_metrics','cluster_metrics.csv'))
-                                metrics = parse_clusterMetrics(kilosort4_path);
-                                kilosort.clusters = [metrics removevars(kilosort.clusters, 'cluster_id')];
-                            else
-                                kilosort.clusters.sess_name = repmat(S1.sess_name,height(kilosort.clusters),1);
-                                kilosort.clusters.probe_id = repmat(S1.metadata.probe_index(probe)-1,height(kilosort.clusters),1);
-                                kilosort.clusters.probe_label = repmat(S1.metadata.probe_label{probe},height(kilosort.clusters),1);
-                                kilosort.clusters.probe_type = repmat(S1.metadata.probe_type{probe},height(kilosort.clusters),1);
-                                kilosort.clusters.probe_config = repmat(S1.metadata.probe_config{probe},height(kilosort.clusters),1);
-                                kilosort.clusters.hardware_config = repmat(S1.metadata.hardware_config{probe},height(kilosort.clusters),1);
-                                kilosort.clusters.probe_depth_mm = repmat(S1.metadata.probe_depth_mm(probe),height(kilosort.clusters),1);
-                                kilosort.clusters.probe_gridHole = repmat({S1.metadata.probe_gridHole{probe}},height(kilosort.clusters),1);
-                            end
-                            kilosort.clusters.probe_index = repmat(probe,height(kilosort.clusters),1);
-                            kilosort.clusters = movevars(kilosort.clusters,{'probe_index'},'After','sess_name');
-     
-                            kilosort_all = [kilosort_all; kilosort];
-
-                            if probe==numel(imec_dirs)
-                                jsonStr = fileread(fullfile(kilosort4_path,'params.json'));
-                                protocolStruct = jsondecode(jsonStr);
-                                S1.protocol = protocolStruct;
-                                S1.kilosort = kilosort_all;
-                            end
-                        end
+                    [spikes_perTrial,kilosort,trlAvg_frs] = parse_KilosortToTbl(tbl,fullfile(kilosort4_path,'sorter_output'),'NP_ALIGN_PULSES',these_alignTimes,'Fs',S1.metadata.ap_meta(probe).imSampRate);
+                    tbl.(sprintf('spiketimes_%d',probe)) = spikes_perTrial;
+                    trlAvg_frs_all{probe} = trlAvg_frs;
+                    
+                    if nevnum==1
+                        kilosort.probe_index = probe;
+                        fields = fieldnames(kilosort);
+                        fields(strcmp(fields, 'probe_index')) = [];
+                        kilosort = orderfields(kilosort, ['probe_index'; fields]);
     
-                        
-                    end 
+                        if isfile(fullfile(kilosort4_path,'quality_metrics','cluster_metrics.csv'))
+                            metrics = parse_clusterMetrics(kilosort4_path);
+                            kilosort.clusters = [metrics removevars(kilosort.clusters, 'cluster_id')];
+                        else
+                            kilosort.clusters.sess_name = repmat(S1.sess_name,height(kilosort.clusters),1);
+                            kilosort.clusters.probe_id = repmat(S1.metadata.probe_index(probe)-1,height(kilosort.clusters),1);
+                            kilosort.clusters.probe_label = repmat(S1.metadata.probe_label{probe},height(kilosort.clusters),1);
+                            kilosort.clusters.probe_type = repmat(S1.metadata.probe_type{probe},height(kilosort.clusters),1);
+                            kilosort.clusters.probe_config = repmat(S1.metadata.probe_config{probe},height(kilosort.clusters),1);
+                            kilosort.clusters.hardware_config = repmat(S1.metadata.hardware_config{probe},height(kilosort.clusters),1);
+                            kilosort.clusters.probe_depth_mm = repmat(S1.metadata.probe_depth_mm(probe),height(kilosort.clusters),1);
+                            kilosort.clusters.probe_gridHole = repmat({S1.metadata.probe_gridHole{probe}},height(kilosort.clusters),1);
+                        end
+                        kilosort.clusters.probe_index = repmat(probe,height(kilosort.clusters),1);
+                        kilosort.clusters = movevars(kilosort.clusters,{'probe_index'},'After','sess_name');
+ 
+                        kilosort_all = [kilosort_all; kilosort];
+
+                        if probe==numel(imec_dirs)
+                            jsonStr = fileread(fullfile(kilosort4_path,'params.json'));
+                            protocolStruct = jsondecode(jsonStr);
+                            S1.protocol = protocolStruct;
+                            S1.kilosort = kilosort_all;
+                        end
+                    end
                 end
             end
 
@@ -282,19 +277,19 @@ function process_fullRecording(session_name,varargin)
                     S1.kilosort(probe).clusters.([this_task, '_Hz']) = trlAvg_frs_all{probe};
                 end
             end
- 
-            %last_alignID = last_alignID + height(tbl);   
-
-            if nevnum==length(nevnames)
-                ff = fieldnames(S1);
-                S1 = orderfields(S1, ["kilosort"; ff(~strcmp(ff,'kilosort'))]);
-            end
         end
 
         % Remove trials with absolutely no spikes in them
         colnames = tbl.Properties.VariableNames(contains(tbl.Properties.VariableNames, 'spiketimes'));
         if ~isempty(colnames)
-            tbl(cellfun(@(q) sum(cellfun(@(w) numel(w), q, 'uni', 1)), tbl.(colnames{1}), 'uni', 1) == 0, :) = [];
+            % logical mask: true if ANY of the spiketimes columns is empty for that row
+            emptyMask = false(height(tbl),1);
+            for c = 1:numel(colnames)
+                emptyMask = emptyMask | cellfun(@(q) isempty(q) || all(cellfun(@isempty, q)), tbl.(colnames{c}));
+            end
+            
+            % remove rows where any col is empty
+            tbl(emptyMask,:) = [];
         end
 
         tbl.sess_name = repmat({session_name}, height(tbl), 1);

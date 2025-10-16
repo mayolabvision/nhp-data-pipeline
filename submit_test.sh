@@ -1,11 +1,12 @@
 #!/bin/bash -l
 #SBATCH --nodes=1
-#SBATCH --time=0-23:59:59
-#SBATCH --cluster=smp
-#SBATCH --partition=high-mem
+#SBATCH --time=0-00:59:59
+#SBATCH --gres=gpu:1
+#SBATCH --cluster=gpu
+#SBATCH --partition=a100_nvlink
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=32
-#SBATCH --job-name=postproc
+#SBATCH --cpus-per-task=2
+#SBATCH --job-name=test
 #SBATCH --error=/ix1/pmayo/outfiles/out_%A_%a.out
 #SBATCH --output=/ix1/pmayo/outfiles/out_%A_%a.out
 #SBATCH --mail-type=done,fail
@@ -26,21 +27,20 @@ SESSION="${1}"
 PROBE_ID=$SLURM_ARRAY_TASK_ID
 PROTOCOL="${2:-np-nodrift-ks4_wr12.json}"
 
-echo "SESSION    =  '$SESSION'"
+echo "SESSION    =  $SESSION"
 echo "PROBE_ID   =  $PROBE_ID"
 echo "PROTOCOL   =  $PROTOCOL"
-echo "ENV_PATH   =  '$ENV_PATH'"
 
 echo "======================================================"
 
 #################################################################
-####################### RUN SI Sorting ##########################
+##################### RUN SI (PP + Sort) ########################
 
-echo "Running postprocessing pipeline........................"
+echo "Running preprocessing pipeline........................"
 $CONDA_PREFIX/bin/python -c "
-from main_pipeline import run_postprocess
+from main_pipeline import run_preprocess
 
-run_postprocess(
+run_preprocess(
     '${SESSION}', 
     probe_id=int('$PROBE_ID'),
     protocol='${PROTOCOL}' 

@@ -3,10 +3,11 @@ import os
 from pathlib import Path
 import numpy as np
 import pandas as pd
+from scipy.signal import savgol_filter
 
-from spikeinterface.core import set_global_job_kwargs
+from spikeinterface.core import set_global_job_kwargs, BaseRecording
 from spikeinterface.extractors import get_neo_streams, read_spikeglx
-from spikeinterface.preprocessing import apply_preprocessing_pipeline
+from spikeinterface.preprocessing import apply_preprocessing_pipeline, compute_motion
 from spikeinterface.core.motion import Motion
 from spikeinterface.sortingcomponents.peak_detection import detect_peaks
 from spikeinterface.sortingcomponents.peak_localization import localize_peaks
@@ -33,12 +34,59 @@ def load_or_compute_peaks(preprocess_path, recording, protocol):
 
     return peaks, peak_locations
 
-def run_preprocessing_with_motion_correction(data_path, probe_id, protocol, preprocess_path):
+def detect_excessive_motion(raw_recording, preprocess_path, threshold_um=1000, min_duration_sec=30):
+    
+    if not (preprocess_path.parent.parent / 'rigid_fast_motion.npy').is_file():
+        preprocessing_dict = {
+        'bandpass_filter': {'freq_min': 300, 'freq_max': 5000, 'dtype': 'int16'},
+        'phase_shift': {},
+        'common_reference': {'operator': 'median', 'reference': 'global'}
+        }
+
+        pp_recording = apply_preprocessing_pipeline(raw_recording, preprocessing_dict)
+       
+        motion = compute_motion(pp_recording, preset="rigid_fast") 
+        
+        np.save(preprocess_path.parent.parent / 'rigid_fast_motion.npy', motion.displacement)
+        np.save(preprocess_path.parent.parent / 'rigid_fast_time_bins.npy', motion.temporal_bins_s)
+        np.save(preprocess_path.parent.parent / 'rigid_fast_depth_bins.npy', motion.spatial_bins_um)
+    
+    motion = np.load(preprocess_path.parent.parent / 'rigid_fast_motion.npy')
+    time_bins = np.load(preprocess_path.parent.parent / 'rigid_fast_time_bins.npy')
+    depth_bins = np.load(preprocess_path.parent.parent / 'rigid_fast_depth_bins.npy') 
+    
+    time_bins = time_bins[0] - time_bins[0][0]       # start time (in sec) at 0
+    motion = (motion[0] - motion[0][0]).squeeze()    # initial motion at 0 µm
+
+    motion_smooth = savgol_filter(motion, window_length=11, polyorder=3)
+
+    # --- calculate onset time ---
+    onset_time_sec = None
+    onset_time_frame = None
+
+    # mask: don't worry about initial noise issues
+    mask = time_bins >= 1200
+
+    above_thresh = (np.abs(motion_smooth) > threshold_um) & mask
+
+    if np.any(above_thresh):
+        idx = np.where(above_thresh)[0]
+
+        # Find breaks between contiguous stretches
+        breaks = np.where(np.diff(idx) > 1)[0] + 1
+        segments = np.split(idx, breaks)
+
+        for segment in segments:
+            duration = time_bins[segment[-1]] - time_bins[segment[0]]
+            if duration >= min_duration_sec:
+                onset_time_sec = time_bins[segment[0]]
+                break
+
+    return onset_time_sec 
+
+def run_preprocessing_with_motion_correction(raw_recording, protocol, preprocess_path):
     os.makedirs(preprocess_path, exist_ok=True)
     
-    stream_names, stream_ids = get_neo_streams('spikeglx', data_path)
-    raw_recording = read_spikeglx(data_path, stream_name=f'imec{probe_id}.ap', load_sync_channel=False)
-
     if not (preprocess_path / 'motion.npy').exists():
         pp_recording1 = apply_preprocessing_pipeline(raw_recording, protocol['motion_correction']['preprocessing'])
 
@@ -85,10 +133,7 @@ def run_preprocessing_with_motion_correction(data_path, probe_id, protocol, prep
     
     return mc_recording
 
-def run_preprocessing_without_motion_correction(data_path, probe_id, protocol, preprocess_path):
-    stream_names, stream_ids = get_neo_streams('spikeglx', data_path)
-    raw_recording = read_spikeglx(data_path, stream_name=f'imec{probe_id}.ap', load_sync_channel=False)
-
+def run_preprocessing_without_motion_correction(raw_recording, protocol, preprocess_path):
     pp_recording = apply_preprocessing_pipeline(raw_recording, protocol['preprocessing'])
 
     return pp_recording.astype(float)
