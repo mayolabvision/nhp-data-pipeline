@@ -27,7 +27,7 @@ NEV_PATH=$(python -c "import config; print(config.NEVUTIL_PATH)")
 echo "======================================================"
 
 SESSION="${1}"
-PROTOCOL="${2:-np-nodrift-ks4_wr12.json}"
+PROTOCOL="${2:-np-nodrift-ks4_wr12}"
 
 echo "SESSION    =  '$SESSION'"
 echo "PROTOCOL   =  $PROTOCOL"
@@ -43,7 +43,7 @@ from main_pipeline import profile_to_mat
 
 print(profile_to_mat(
     '${SESSION}', 
-    protocol='${PROTOCOL}' 
+    protocol='${PROTOCOL}.json' 
 ))
 ")
 
@@ -59,27 +59,31 @@ NEV_PATH=$(python -c "import config; print(config.NEVUTIL_PATH)")
 
 echo "Running matlab pipeline........................"
 matlab -nodisplay <<EOF
-try
-    addpath(genpath('matlab'));   % add the subdirectory to path
-    fprintf('Running process_fullRecording for $1\n');
-    process_fullRecording('${SESSION}', ...
-        'RAW_DATA_PATH', '$RAW_PATH', ...
-        'OUT_DATA_PATH', '$OUT_PATH', ...
-        'NEVUTIL_PATH', '$NEV_PATH', ...
-        'SORTER_PATH', '$SORTER_PATH');
-catch err
-    disp('ERROR in process_fullRecording:');
-    disp(getReport(err));
-    exit(1);
-end
+addpath(genpath('matlab'));   % add the subdirectory to path
+fprintf('Running process_fullRecording for $1\n');
+process_fullRecording('${SESSION}', ...
+    'RAW_DATA_PATH', '$RAW_PATH', ...
+    'OUT_DATA_PATH', '$OUT_PATH', ...
+    'NEVUTIL_PATH', '$NEV_PATH', ...
+    'SORTER_PATH', '$SORTER_PATH');
 exit
 EOF
 
 #################################################################
-
 TBL_PATH="${OUT_DATA_PATH}/${SESSION}/tables/${SESSION}-${SORTER_PATH}.mat"
+echo "TBL_PATH    =  '$TBL_PATH'"
+echo "======================================================"
 
-
+echo "Running extra matlab fxns........................"
+matlab -nodisplay <<EOF
+addpath(genpath('matlab'));
+addpath(genpath('$HELPERS_PATH/behavior'));
+addpath(genpath('$HELPERS_PATH/neurons'));
+fprintf('Running addToTbl_KKN for $1\n');
+addToTbl_KKN('$TBL_PATH', ...
+    'SAVE_NAME', $PROTOCOL);
+exit
+EOF
 
 #################################################################
 echo "DONE"
