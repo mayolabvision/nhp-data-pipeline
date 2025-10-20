@@ -31,7 +31,7 @@ HELPERS_PATH=$(python -c "import config; print(config.HELPERS_PATH)")
 echo "======================================================"
 
 SESSION="${1}"
-PROTOCOL="${2:-np-nodrift-ks4_wr12.json}"
+PROTOCOL="${2:-np-nodrift-ks4_wr12}"
 PROBE_ID="${3:-1}"
 
 echo "SESSION    =  $SESSION"
@@ -49,14 +49,14 @@ from main_pipeline import profile_to_mat
 
 print(profile_to_mat(
     '${SESSION}', 
-    protocol='${PROTOCOL}' 
+    protocol='${PROTOCOL}.json' 
 ))
 ")
 
 echo "SORTER_PATH    =  '$SORTER_PATH'"
 echo "======================================================"
 
-DATA_PATH="${RAW_DATA_PATH}/${SESSION}/tables/${SESSION}-${SORTER_PATH}.mat"
+DATA_PATH="${RAW_DATA_PATH}/${SESSION}/tables/${SESSION}-${PROTOCOL}.mat"
 FIG_PATH="${RAW_DATA_PATH}/${SESSION}/figs/${SORTER_PATH}/"
 
 echo "DATA_PATH: $DATA_PATH"

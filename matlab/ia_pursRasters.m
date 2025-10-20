@@ -110,13 +110,13 @@ function ia_pursRasters(data,varargin)
 
     if ~ismember('pursType', T.Properties.VariableNames)
         % Calculate eye traces 
-        eyePos = cellfun(@(x) filterEyeTraces_EyeLink(x,'SAMPLING_FREQUENCY',1000,'CUTOFF_FREQUENCY',84,'PLOT_TRIAL',false), T.eyedata, 'uni', 0);
-        eyeVel = cellfun(@(q) calcDerivative_eyeTraces(q), cellfun(@(x) filterEyeTraces_EyeLink(x,'SAMPLING_FREQUENCY',1000,'CUTOFF_FREQUENCY',40,'PLOT_TRIAL',false), T.eyedata, 'uni', 0), 'uni', 0);                                                                        
-        eyeAcc = cellfun(@(q) calcDerivative_eyeTraces(q), eyeVel, 'uni', 0);
-        T.eyePos = eyePos; T.eyeVel = eyeVel; T.eyeAcc = eyeAcc;
+        %eyePos = cellfun(@(x) filterEyeTraces_EyeLink(x,'SAMPLING_FREQUENCY',1000,'CUTOFF_FREQUENCY',84,'PLOT_TRIAL',false), T.eyedata, 'uni', 0);
+        %eyeVel = cellfun(@(q) calcDerivative_eyeTraces(q), cellfun(@(x) filterEyeTraces_EyeLink(x,'SAMPLING_FREQUENCY',1000,'CUTOFF_FREQUENCY',40,'PLOT_TRIAL',false), T.eyedata, 'uni', 0), 'uni', 0);                                                                        
+        %eyeAcc = cellfun(@(q) calcDerivative_eyeTraces(q), eyeVel, 'uni', 0);
+        %T.eyePos = eyePos; T.eyeVel = eyeVel; T.eyeAcc = eyeAcc;
 
 
-        [pursuitOnsets,rxnTimes,msOffsets,csOnsets,csVelocities,csPeaks,csOffsets,csAngles,crossingTimes] = deal(nan(height(T), 1));
+        %[pursuitOnsets,rxnTimes,msOffsets,csOnsets,csVelocities,csPeaks,csOffsets,csAngles,crossingTimes] = deal(nan(height(T), 1));
         csTypes = cell(height(T),1);
         for t = 1:height(T)
             [pursuit_onset,rxnTime,msOffset,csOnset,csVelocity,csPeak,csOffset,csAngle,csType] = detect_pursuitOnset(T.eyePos{t},T.eyeVel{t},T.PURSUIT_TARG_ON(t),T(t,:).params.block.crossingTime,T.pursuitSpeed(t),T.angle(t),'PLOT_TRACES',false);

@@ -23,7 +23,7 @@ source activate "$ENV_PATH"
 echo "======================================================"
 
 SESSION="${1}"
-PROTOCOL="${2:-np-nodrift-ks4_wr12.json}"
+PROTOCOL="${2:-np-nodrift-ks4_wr12}"
 
 PROBE_ID=$SLURM_ARRAY_TASK_ID
 
@@ -42,8 +42,8 @@ from main_pipeline import run_preprocess
 
 run_preprocess(
     '${SESSION}', 
-    probe_id=int('$PROBE_ID'),
-    protocol='${PROTOCOL}' 
+    probe_id=int('${PROBE_ID}'),
+    protocol='${PROTOCOL}.json' 
 )"
 
 echo "======================================================"

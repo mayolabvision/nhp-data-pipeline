@@ -25,7 +25,7 @@ echo "======================================================"
 
 SESSION="${1}"
 PROBE_ID=$SLURM_ARRAY_TASK_ID
-PROTOCOL="${2:-np-nodrift-ks4_wr12.json}"
+PROTOCOL="${2:-np-nodrift-ks4_wr12}"
 
 echo "SESSION    =  $SESSION"
 echo "PROBE_ID   =  $PROBE_ID"
@@ -43,7 +43,7 @@ from main_pipeline import run_sorting
 run_sorting(
     '${SESSION}', 
     probe_id=int('$PROBE_ID'),
-    protocol='${PROTOCOL}' 
+    protocol='${PROTOCOL}.json' 
 )"
 
 echo "======================================================"
