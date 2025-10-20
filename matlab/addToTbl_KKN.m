@@ -61,7 +61,7 @@ function S = addToTbl_KKN(data,varargin)
 
     fns = fieldnames(S);
 
-    % 2. Make some edits to RFM
+    % 2. Make some edits to RFMAP
     matchingFields = fns(contains(fns, {'rfmp', 'rfMapping'}, 'IgnoreCase', true));
     for f = 1:numel(matchingFields)
         tbl = S.(matchingFields{f}).tbl;
@@ -214,9 +214,9 @@ function S = addToTbl_KKN(data,varargin)
 
         tbl = tbl(tbl.pursuitLatency >= 60 & tbl.pursuitLatency < 150,:);
 
-        csTrials = cellfun(@(u,v) sum(((cellfun(@(q) q(2), u, 'uni', 1) - (v)) >= -25) & ((cellfun(@(q) q(1), u, 'uni', 1) - (v+tbl.params(1).block.crossingTime)) < 150)), tbl.saccades, num2cell(tbl.PURSUIT_TARG_ON), 'uni', 1);
-
-        tbl = tbl(~csTrials,:);
+        csTrials = cellfun(@(u,v) sum(((cellfun(@(q) q(2), u, 'uni', 1) - (v)) >= 0) & ((cellfun(@(q) q(1), u, 'uni', 1) - (v+tbl.params(1).block.crossingTime)) < 150)), tbl.saccades, num2cell(tbl.PURSUIT_TARG_ON), 'uni', 1);
+        tbl.pursType = repmat(categorical("sacc"),height(tbl),1);
+        tbl.pursType(~logical(csTrials)) = "pure";
 
         [~,rVel] = cellfun(@(q) cart2pol(q(1,:),q(2,:)), tbl.eyeVel, 'uni', 0);
         rVel = cellfun(@(u,v) u(v+50:v+200), rVel, num2cell(tbl.pursuitOnset), 'uni', 0);

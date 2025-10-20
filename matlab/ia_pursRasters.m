@@ -1,6 +1,7 @@
 function ia_pursRasters(data,varargin)
-    %UNTITLED2 Summary of this function goes here
-    %   Detailed explanation goes here
+    % ff
+    % ff
+
     p = inputParser;
     addRequired(p, 'data', @(x) (ischar(x)) || isstruct(x));
     addParameter(p, 'FIG_PATH', [], @ischar);
@@ -31,11 +32,11 @@ function ia_pursRasters(data,varargin)
 
     fprintf('\n------------------------------\n')
     if ischar(data)
-        [~, filename, ~] = fileparts(data);
+        %[~, filename, ~] = fileparts(data);
         load(data, 'S');
-        fprintf(sprintf('\n----Data loaded for %s----\n',filename))
+        fprintf('\n----Data loaded----\n')
     else
-        filename = data.sessionName;
+        %filename = data.sessionName;
         S = data;
     end
 
@@ -83,6 +84,8 @@ function ia_pursRasters(data,varargin)
             FIG_PATH2 = fullfile(FIG_PATH, sprintf('%s_%s',hardware_config, probe_label), 'purs_rasters', sprintf('all_trls-%s_aligned',ALIGN));
         end
         if ~exist(FIG_PATH2, 'dir'), mkdir(FIG_PATH2); end
+    else
+        FIG_PATH2 = 'blahblah';
     end
 
     if isequal(ALIGN,'targ')
@@ -108,29 +111,31 @@ function ia_pursRasters(data,varargin)
 
     T = T(T.result=='CORRECT',:);
 
-    if ~ismember('pursType', T.Properties.VariableNames)
-        % Calculate eye traces 
-        %eyePos = cellfun(@(x) filterEyeTraces_EyeLink(x,'SAMPLING_FREQUENCY',1000,'CUTOFF_FREQUENCY',84,'PLOT_TRIAL',false), T.eyedata, 'uni', 0);
-        %eyeVel = cellfun(@(q) calcDerivative_eyeTraces(q), cellfun(@(x) filterEyeTraces_EyeLink(x,'SAMPLING_FREQUENCY',1000,'CUTOFF_FREQUENCY',40,'PLOT_TRIAL',false), T.eyedata, 'uni', 0), 'uni', 0);                                                                        
-        %eyeAcc = cellfun(@(q) calcDerivative_eyeTraces(q), eyeVel, 'uni', 0);
-        %T.eyePos = eyePos; T.eyeVel = eyeVel; T.eyeAcc = eyeAcc;
-
-
-        %[pursuitOnsets,rxnTimes,msOffsets,csOnsets,csVelocities,csPeaks,csOffsets,csAngles,crossingTimes] = deal(nan(height(T), 1));
-        csTypes = cell(height(T),1);
-        for t = 1:height(T)
-            [pursuit_onset,rxnTime,msOffset,csOnset,csVelocity,csPeak,csOffset,csAngle,csType] = detect_pursuitOnset(T.eyePos{t},T.eyeVel{t},T.PURSUIT_TARG_ON(t),T(t,:).params.block.crossingTime,T.pursuitSpeed(t),T.angle(t),'PLOT_TRACES',false);
-            pursuitOnsets(t) = pursuit_onset; rxnTimes(t) = rxnTime; msOffsets(t) = msOffset; csOnsets(t) = csOnset; csVelocities(t) = csVelocity; csPeaks(t) = csPeak; csOffsets(t) = csOffset; csAngles(t) = csAngle; csTypes{t} = csType;
-            crossingTimes(t) = T(t,:).params.block.crossingTime;
-        end
-
-        T.pursuitOnset = pursuitOnsets; T.pursuitLatency = rxnTimes;
-        T.msOffset = msOffsets; T.CROSSING_TIME = crossingTimes;
-        T.csTimes = [csOnsets, csPeaks, csOffsets]; T.csVelocity = csVelocities; T.csAngle = csAngles;
-        T.pursType = csTypes; T.pursType = categorical(string(T.pursType));
+    if ~ismember('eyePos',T.Properties.VariableNames)
+         eyePos = cellfun(@(x) filterEyeTraces_EyeLink(x), T.eyedata, 'uni', 0);
+        [eyeVel, eyeAcc] = cellfun(@(x) calcDerivative_eyeTraces(x), eyePos, 'uni', 0);
+    
+        T.eyePos = eyePos; T.eyeVel = eyeVel; T.eyeAcc = eyeAcc;
     end
 
-    T = T(T.msOffset<0 | isnan(T.msOffset),:);
+    if ~ismember('saccades', T.Properties.VariableNames)
+        saccades = cellfun(@(q) detect_saccades(q, 'VEL_THRESH', 30, 'ACC_THRESH', 500), cellfun(@(v,f) v(:,f(1):end), eyeVel, num2cell(T.FIXATE), 'uni', 0), 'uni', 0);
+        T.saccades = cellfun(@(q,v) num2cell(q+v(1),2), saccades, num2cell(T.FIXATE), 'uni', 0);
+    end
+
+    if ~ismember('pursuitOnset', T.Properties.VariableNames)
+        [pursuitOnset, pursuitLatency] = cellfun(@(u,v,w) detect_pursuitOnset(u, v, w, 'PLOT_TRACES', false), T.eyeVel, num2cell(T.PURSUIT_TARG_ON), num2cell(T.pursuitSpeed), 'uni', 1); 
+        T.pursuitOnset = pursuitOnset;
+        T.pursuitLatency = pursuitLatency;
+    end
+
+    if ~ismember('pursType', T.Properties.VariableNames)
+        csTrials = cellfun(@(u,v) sum(((cellfun(@(q) q(2), u, 'uni', 1) - (v)) >= 0) & ((cellfun(@(q) q(1), u, 'uni', 1) - (v+T.params(1).block.crossingTime)) < 150)), T.saccades, num2cell(T.PURSUIT_TARG_ON), 'uni', 1);
+        T.pursType = repmat(categorical("sacc"),height(T),1);
+        T.pursType(~logical(csTrials)) = "pure";
+    end
+
+    %T = T(T.msOffset<0 | isnan(T.msOffset),:);
 
     if PURE_ONLY
         T = T(T.pursType=='pure' & T.jump==-1,:);
@@ -194,10 +199,12 @@ function ia_pursRasters(data,varargin)
                         frs_perAng{ang,dd} = cellfun(@(q) (sum(q>=FR_WIN(1) & q <FR_WIN(2))*(1000/(FR_WIN(2)-FR_WIN(1)))), sptimes(these_trls.pursuitSpeed==speeds(dd)), 'uni', 1);
                     end
 
-                    if ~isempty(TICK_LENGTH)
-                        raster_sdf(sptimes', 'TIME_WINDOW', X_LIMITS, 'LINE_COLOR', line_colors, 'SEM_SHADE', sem_shades, 'TICK_COLOR', tick_colors, 'FR_WINDOW', FR_WIN, 'TICK_LENGTH', TICK_LENGTH)
-                    else
-                        raster_sdf(sptimes', 'TIME_WINDOW', X_LIMITS, 'LINE_COLOR', line_colors, 'SEM_SHADE', sem_shades, 'TICK_COLOR', tick_colors, 'FR_WINDOW', FR_WIN)
+                    if size(sptimes,1) > 1
+                        if ~isempty(TICK_LENGTH)
+                            raster_sdf(sptimes', 'TIME_WINDOW', X_LIMITS, 'LINE_COLOR', line_colors, 'SEM_SHADE', sem_shades, 'TICK_COLOR', tick_colors, 'FR_WINDOW', FR_WIN, 'TICK_LENGTH', TICK_LENGTH)
+                        else
+                            raster_sdf(sptimes', 'TIME_WINDOW', X_LIMITS, 'LINE_COLOR', line_colors, 'SEM_SHADE', sem_shades, 'TICK_COLOR', tick_colors, 'FR_WINDOW', FR_WIN)
+                        end
                     end
                 end
         
