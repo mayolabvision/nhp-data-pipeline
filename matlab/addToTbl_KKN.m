@@ -42,7 +42,27 @@ function S = addToTbl_KKN(data,varargin)
         S.kilosort(c).clusters = clusts;
     end
 
-    % bw = 10*30000;
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    fns = fieldnames(S);
+    behavs = fns(structfun(@(q) isfield(q,'tbl'), S));
+
+    % rates = [];
+    % for b = 1:numel(behavs)
+    %     hz = [];
+    %     for p = 1:size(S.kilosort,1)
+    %         spks = S.(behavs{b}).tbl.(sprintf('spiketimes_%d',p));
+    %         spks = vertcat(spks{:});
+    % 
+    %         cnts = cellfun(@(q) numel(q), spks, 'uni', 1);
+    %         lngs = S.(behavs{b}).tbl.END_TRIAL./1000;
+    % 
+    %         hz1 = cnts ./ lngs;
+    %         hz = [hz, hz1(S.(behavs{b}).tbl.result=='CORRECT',:)];
+    %     end
+    %     rates = [rates; zscore(hz)];
+    % end
+
+    % bw = 1*30000;
     % spks_binned = nan(lastClust,numel(min(mins):bw:max(maxs)-bw));
     % x = (min(mins):bw:max(maxs)-bw)./30000;
     % clust = 1;
@@ -53,37 +73,60 @@ function S = addToTbl_KKN(data,varargin)
     %         clust = clust + 1;
     %     end
     % end
+    % 
+    % spks = zscore(spks_binned');
+    % [~, score, ~, ~, ~] = pca(spks);  
+    % pc1 = score(:,1);
+    % pc1_smooth = movmean(pc1,5);   % optional smoothing
+    % cp_candidate = findchangepts(pc1_smooth, 'MaxNumChanges',1,'Statistic','mean');
+    % 
+    % % measure the jump in mean before vs after
+    % mean_before = mean(pc1_smooth(1:cp_candidate-1));
+    % mean_after  = mean(pc1_smooth(cp_candidate+1:end));
+    % jump = abs(mean_after - mean_before);
+    % 
+    % % set a minimum threshold for a real shift
+    % jump_threshold = 10;  % tune based on your z-scored PC1 units
+    % if jump < jump_threshold
+    %     cp = NaN;  % no significant shift detected
+    %     disp('No major shift detected in this session.');
+    % else
+    %     cp = cp_candidate;
+    %     fprintf('Detected big shift at second %.0f\n', cp);
+    % end
+
+
     % mean_fr = mean(spks_binned);
     % idx = findchangepts(mean_fr, 'Statistic', 'std');
     % cutoff_sec = x(idx);
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% BEHAVIOR %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 
-    fns = fieldnames(S);
-
     % 2. Make some edits to RFMAP
     matchingFields = fns(contains(fns, {'rfmp', 'rfMapping'}, 'IgnoreCase', true));
     for f = 1:numel(matchingFields)
         tbl = S.(matchingFields{f}).tbl;
 
-        if contains(string(tbl.sess_name(1)),'scrappy')
-            tbl.monkey = repmat(categorical("S"),height(tbl),1);
-        else
-            tbl.monkey = repmat(categorical("Y"),height(tbl),1);
+        if ~isempty(tbl)
+            if contains(string(tbl.sess_name(1)),'scrappy')
+                tbl.monkey = repmat(categorical("S"),height(tbl),1);
+            else
+                tbl.monkey = repmat(categorical("Y"),height(tbl),1);
+            end
+    
+            tbl.STIM_ON(tbl.result~='CORRECT') = cellfun(@(q) q(1:end-1), tbl.STIM_ON(tbl.result~='CORRECT'), 'uni', 0);
+            tbl.STIM_OFF(tbl.result~='CORRECT') = cellfun(@(q) q(1:end-1), tbl.STIM_OFF(tbl.result~='CORRECT'), 'uni', 0);
+            tbl.conditions = cellfun(@(q,v) q(1:numel(v)), tbl.conditions, tbl.STIM_ON, 'uni', 0);
+            tbl = tbl(cellfun(@(q) ~isempty(q), tbl.conditions, 'uni', 1),:);
+    
+            eyePos = cellfun(@(x) filterEyeTraces_EyeLink(x), tbl.eyedata, 'uni', 0);
+            [eyeVel, eyeAcc] = cellfun(@(x) calcDerivative_eyeTraces(x), eyePos, 'uni', 0);
+    
+            tbl.eyePos = eyePos; tbl.eyeVel = eyeVel; tbl.eyeAcc = eyeAcc;
+    
+            saccades = cellfun(@(q) detect_saccades(q), cellfun(@(v,f) v(:,f(1):end), eyeVel, tbl.FIXATE, 'uni', 0), 'uni', 0);
+            tbl.saccades = cellfun(@(q,v) num2cell(q+v(1),2), saccades, tbl.FIXATE, 'uni', 0);
         end
-
-        tbl.STIM_ON(tbl.result~='CORRECT') = cellfun(@(q) q(1:end-1), tbl.STIM_ON(tbl.result~='CORRECT'), 'uni', 0);
-        tbl.STIM_OFF(tbl.result~='CORRECT') = cellfun(@(q) q(1:end-1), tbl.STIM_OFF(tbl.result~='CORRECT'), 'uni', 0);
-        tbl.conditions = cellfun(@(q,v) q(1:numel(v)), tbl.conditions, tbl.STIM_ON, 'uni', 0);
-        tbl = tbl(cellfun(@(q) ~isempty(q), tbl.conditions, 'uni', 1),:);
-
-        eyePos = cellfun(@(x) filterEyeTraces_EyeLink(x), tbl.eyedata, 'uni', 0);
-        [eyeVel, eyeAcc] = cellfun(@(x) calcDerivative_eyeTraces(x), eyePos, 'uni', 0);
-
-        tbl.eyePos = eyePos; tbl.eyeVel = eyeVel; tbl.eyeAcc = eyeAcc;
-
-        saccades = cellfun(@(q) detect_saccades(q), cellfun(@(v,f) v(:,f(1):end), eyeVel, tbl.FIXATE, 'uni', 0), 'uni', 0);
-        tbl.saccades = cellfun(@(q,v) num2cell(q+v(1),2), saccades, tbl.FIXATE, 'uni', 0);
 
         S.(matchingFields{f}).tbl = tbl;
     end
@@ -93,81 +136,83 @@ function S = addToTbl_KKN(data,varargin)
     for f = 1:numel(matchingFields)
         tbl = S.(matchingFields{f}).tbl;
 
-        if contains(string(tbl.sess_name(1)),'scrappy')
-            tbl.monkey = repmat(categorical("S"),height(tbl),1);
-        else
-            tbl.monkey = repmat(categorical("Y"),height(tbl),1);
-        end
-
-        tbl = tbl(tbl.result=='CORRECT',:);
-
-        spks1 = cellfun(@(r) cellfun(@(q) numel(q), r, 'uni', 1), tbl.spiketimes_1, 'uni', 0);
-        spks1 = cellfun(@(q,v) (q./v)*1000, spks1, num2cell(tbl.END_TRIAL), 'uni', 0);
-
-        if ismember('spiketimes_2',tbl.Properties.VariableNames)
-            spks2 = cellfun(@(r) cellfun(@(q) numel(q), r, 'uni', 1), tbl.spiketimes_2, 'uni', 0);
-            spks2 = cellfun(@(q,v) (q./v)*1000, spks2, num2cell(tbl.END_TRIAL), 'uni', 0);
-
-            spks = [vertcat(spks1{:}) vertcat(spks2{:})];
-        else
-            spks = vertcat(spks1{:});
-        end
-
-        mask = (spks >= (mean(spks, 1) - 3*std(spks, 0, 1))) & (spks <= (mean(spks, 1) + 3*std(spks, 0, 1)));
-        tbl = tbl((sum(mask,2) < (mean(sum(mask,2)) + std(sum(mask,2))*3)) & (sum(mask,2) > (mean(sum(mask,2)) - std(sum(mask,2))*3)), :);
-
-        eyePos = cellfun(@(x) filterEyeTraces_EyeLink(x), tbl.eyedata, 'uni', 0);
-        [eyeVel, eyeAcc] = cellfun(@(x) calcDerivative_eyeTraces(x), eyePos, 'uni', 0);
-
-        tbl.eyePos = eyePos; tbl.eyeVel = eyeVel; tbl.eyeAcc = eyeAcc;
-
-        saccades = cellfun(@(q) detect_saccades(q), cellfun(@(v,f) v(:,f(1):end), eyeVel, tbl.FIXATE, 'uni', 0), 'uni', 0);
-        tbl.saccades = cellfun(@(q,v) num2cell(q+v(1),2), saccades, tbl.FIXATE, 'uni', 0);
-
-        tbl.saccadeOnset = nan(height(tbl),1);
-        for t = 1:height(tbl)
-            x = cellfun(@(q) q(1), tbl.saccades{t}, 'uni', 1) - tbl.SACCADE(t);
-            x(x>0)=NaN;
-            [~,m] = min(abs(x));
-
-            tbl.saccadeOnset(t) = tbl.saccades{t}{m}(1);
-            tbl.saccadeOffset(t) = tbl.saccades{t}{m}(2);
-        end
-
-        tbl.saccadeLatency = tbl.saccadeOnset - cell2mat(tbl.FIX_OFF);
-        
-        tbl = tbl(tbl.saccadeLatency>=100,:);
-
-        % Det if first saccade out of fixation window landed in targ win
-        inTargets = nan(height(tbl),1); 
-        [dThetas,dRhos,dists] = deal(cell(height(tbl),1));
-        for t = 1:height(tbl)
-            % radial position of eye at s
-            [theta_eye, rho_eye] = cart2pol(tbl.eyePos{t}(1,tbl.saccadeOffset(t)+50),tbl.eyePos{t}(2,tbl.saccadeOffset(t)+50));
-            rho_targ = tbl.distance(t);
-            theta_targ = deg2rad(tbl.angle(t));
-            r_window = pix2deg(tbl.params(t).block.targWinRad,tbl.params(t).block.screenDistance,tbl.params(t).block.pixPerCM);
-
-            theta_eye = mod(theta_eye, 2*pi);
-            theta_targ = mod(theta_targ, 2*pi);
-
-            % Signed difference: positive = clockwise
-            dThetas{t} = rad2deg(- (mod(theta_eye - theta_targ + pi, 2*pi) - pi));
-            dRhos{t} = rho_eye-rho_targ;
-
-            % Compute distance using law of cosines
-            dist = sqrt(rho_eye.^2 + rho_targ^2 - 2*rho_eye*rho_targ.*cos(theta_eye - theta_targ));
-            dists{t} = dist;
+        if ~isempty(tbl)
+            if contains(string(tbl.sess_name(1)),'scrappy')
+                tbl.monkey = repmat(categorical("S"),height(tbl),1);
+            else
+                tbl.monkey = repmat(categorical("Y"),height(tbl),1);
+            end
+    
+            tbl = tbl(tbl.result=='CORRECT',:);
+    
+            spks1 = cellfun(@(r) cellfun(@(q) numel(q), r, 'uni', 1), tbl.spiketimes_1, 'uni', 0);
+            spks1 = cellfun(@(q,v) (q./v)*1000, spks1, num2cell(tbl.END_TRIAL), 'uni', 0);
+    
+            if ismember('spiketimes_2',tbl.Properties.VariableNames)
+                spks2 = cellfun(@(r) cellfun(@(q) numel(q), r, 'uni', 1), tbl.spiketimes_2, 'uni', 0);
+                spks2 = cellfun(@(q,v) (q./v)*1000, spks2, num2cell(tbl.END_TRIAL), 'uni', 0);
+    
+                spks = [vertcat(spks1{:}) vertcat(spks2{:})];
+            else
+                spks = vertcat(spks1{:});
+            end
+    
+            mask = (spks >= (mean(spks, 1) - 3*std(spks, 0, 1))) & (spks <= (mean(spks, 1) + 3*std(spks, 0, 1)));
+            tbl = tbl((sum(mask,2) < (mean(sum(mask,2)) + std(sum(mask,2))*3)) & (sum(mask,2) > (mean(sum(mask,2)) - std(sum(mask,2))*3)), :);
+    
+            eyePos = cellfun(@(x) filterEyeTraces_EyeLink(x), tbl.eyedata, 'uni', 0);
+            [eyeVel, eyeAcc] = cellfun(@(x) calcDerivative_eyeTraces(x), eyePos, 'uni', 0);
+    
+            tbl.eyePos = eyePos; tbl.eyeVel = eyeVel; tbl.eyeAcc = eyeAcc;
+    
+            saccades = cellfun(@(q) detect_saccades(q), cellfun(@(v,f) v(:,f(1):end), eyeVel, tbl.FIXATE, 'uni', 0), 'uni', 0);
+            tbl.saccades = cellfun(@(q,v) num2cell(q+v(1),2), saccades, tbl.FIXATE, 'uni', 0);
+    
+            tbl.saccadeOnset = nan(height(tbl),1);
+            for t = 1:height(tbl)
+                x = cellfun(@(q) q(1), tbl.saccades{t}, 'uni', 1) - tbl.SACCADE(t);
+                x(x>0)=NaN;
+                [~,m] = min(abs(x));
+    
+                tbl.saccadeOnset(t) = tbl.saccades{t}{m}(1);
+                tbl.saccadeOffset(t) = tbl.saccades{t}{m}(2);
+            end
+    
+            tbl.saccadeLatency = tbl.saccadeOnset - cell2mat(tbl.FIX_OFF);
             
-            % Logical array: true if eye is inside target window
-            inTargets(t) = dist <= r_window;  
+            tbl = tbl(tbl.saccadeLatency>=100,:);
+    
+            % Det if first saccade out of fixation window landed in targ win
+            inTargets = nan(height(tbl),1); 
+            [dThetas,dRhos,dists] = deal(cell(height(tbl),1));
+            for t = 1:height(tbl)
+                % radial position of eye at s
+                [theta_eye, rho_eye] = cart2pol(tbl.eyePos{t}(1,tbl.saccadeOffset(t)+50),tbl.eyePos{t}(2,tbl.saccadeOffset(t)+50));
+                rho_targ = tbl.distance(t);
+                theta_targ = deg2rad(tbl.angle(t));
+                r_window = pix2deg(tbl.params(t).block.targWinRad,tbl.params(t).block.screenDistance,tbl.params(t).block.pixPerCM);
+    
+                theta_eye = mod(theta_eye, 2*pi);
+                theta_targ = mod(theta_targ, 2*pi);
+    
+                % Signed difference: positive = clockwise
+                dThetas{t} = rad2deg(- (mod(theta_eye - theta_targ + pi, 2*pi) - pi));
+                dRhos{t} = rho_eye-rho_targ;
+    
+                % Compute distance using law of cosines
+                dist = sqrt(rho_eye.^2 + rho_targ^2 - 2*rho_eye*rho_targ.*cos(theta_eye - theta_targ));
+                dists{t} = dist;
+                
+                % Logical array: true if eye is inside target window
+                inTargets(t) = dist <= r_window;  
+            end
+    
+            tbl.saccadeOffset_dTheta = dThetas;
+            tbl.saccadeOffset_dRho = dRhos;
+            tbl.saccadeOffset_dist = dists;
+    
+            tbl = tbl(inTargets==1,:);
         end
-
-        tbl.saccadeOffset_dTheta = dThetas;
-        tbl.saccadeOffset_dRho = dRhos;
-        tbl.saccadeOffset_dist = dists;
-
-        tbl = tbl(inTargets==1,:);
 
         S.(matchingFields{f}).tbl = tbl;
     end
@@ -177,63 +222,65 @@ function S = addToTbl_KKN(data,varargin)
     for f = 1:numel(matchingFields)
         tbl = S.(matchingFields{f}).tbl;
 
-        if contains(string(tbl.sess_name(1)),'scrappy')
-            tbl.monkey = repmat(categorical("S"),height(tbl),1);
-        else
-            tbl.monkey = repmat(categorical("Y"),height(tbl),1);
+        if ~isempty(tbl)
+            if contains(string(tbl.sess_name(1)),'scrappy')
+                tbl.monkey = repmat(categorical("S"),height(tbl),1);
+            else
+                tbl.monkey = repmat(categorical("Y"),height(tbl),1);
+            end
+    
+            tbl = tbl(tbl.result=='CORRECT' & tbl.jump==-1,:);
+        
+            spks1 = cellfun(@(r) cellfun(@(q) numel(q), r, 'uni', 1), tbl.spiketimes_1, 'uni', 0);
+            spks1 = cellfun(@(q,v) (q./v)*1000, spks1, num2cell(tbl.END_TRIAL), 'uni', 0);
+        
+            if ismember('spiketimes_2',tbl.Properties.VariableNames)
+                spks2 = cellfun(@(r) cellfun(@(q) numel(q), r, 'uni', 1), tbl.spiketimes_2, 'uni', 0);
+                spks2 = cellfun(@(q,v) (q./v)*1000, spks2, num2cell(tbl.END_TRIAL), 'uni', 0);
+        
+                spks = [vertcat(spks1{:}) vertcat(spks2{:})];
+            else
+                spks = vertcat(spks1{:});
+            end
+        
+            mask = (spks >= (mean(spks, 1) - 3*std(spks, 0, 1))) & (spks <= (mean(spks, 1) + 3*std(spks, 0, 1)));
+            tbl = tbl((sum(mask,2) < (mean(sum(mask,2)) + std(sum(mask,2))*3)) & (sum(mask,2) > (mean(sum(mask,2)) - std(sum(mask,2))*3)), :);
+        
+            eyePos = cellfun(@(x) filterEyeTraces_EyeLink(x), tbl.eyedata, 'uni', 0);
+            [eyeVel, eyeAcc] = cellfun(@(x) calcDerivative_eyeTraces(x), eyePos, 'uni', 0);
+        
+            tbl.eyePos = eyePos; tbl.eyeVel = eyeVel; tbl.eyeAcc = eyeAcc;
+    
+            saccades = cellfun(@(q) detect_saccades(q, 'VEL_THRESH', 30, 'ACC_THRESH', 500), cellfun(@(v,f) v(:,f(1):end), eyeVel, num2cell(tbl.FIXATE), 'uni', 0), 'uni', 0);
+            tbl.saccades = cellfun(@(q,v) num2cell(q+v(1),2), saccades, num2cell(tbl.FIXATE), 'uni', 0);
+    
+            [pursuitOnset, pursuitLatency] = cellfun(@(u,v,w) detect_pursuitOnset(u, v, w, 'PLOT_TRACES', false), tbl.eyeVel, num2cell(tbl.PURSUIT_TARG_ON), num2cell(tbl.pursuitSpeed), 'uni', 1); 
+            tbl.pursuitOnset = pursuitOnset;
+            tbl.pursuitLatency = pursuitLatency;
+    
+            tbl = tbl(tbl.pursuitLatency >= 60 & tbl.pursuitLatency < 150,:);
+    
+            csTrials = cellfun(@(u,v) sum(((cellfun(@(q) q(2), u, 'uni', 1) - (v)) >= 0) & ((cellfun(@(q) q(1), u, 'uni', 1) - (v+tbl.params(1).block.crossingTime)) < 150)), tbl.saccades, num2cell(tbl.PURSUIT_TARG_ON), 'uni', 1);
+            tbl.pursType = repmat(categorical("sacc"),height(tbl),1);
+            tbl.pursType(~logical(csTrials)) = "pure";
+    
+            [~,rVel] = cellfun(@(q) cart2pol(q(1,:),q(2,:)), tbl.eyeVel, 'uni', 0);
+            rVel = cellfun(@(u,v) u(v+50:v+200), rVel, num2cell(tbl.pursuitOnset), 'uni', 0);
+            tbl = tbl(cellfun(@(q,v) min(q) > 0.3*v, rVel, num2cell(tbl.pursuitSpeed), 'uni', 1),:);
+    
+            % f = figure;
+            % [~,rVel] = cellfun(@(q) cart2pol(q(1,:),q(2,:)), tbl.eyeVel, 'uni', 0);
+            % rVel = cellfun(@(u,v) u(v-100:v+300), rVel, num2cell(tbl.pursuitOnset), 'uni', 0);
+            % rVel = cellfun(@(x) filterEyeTraces_EyeLink(x,'CUTOFF_FREQUENCY', 20), rVel, 'uni', 0);
+            % 
+            % x = [0:400]-100;
+            % xline(0,'k--');
+            % hold on;
+            % for t = 1:height(tbl)
+            %     plot(x,rVel{t},'k-')
+            % end
+            % ylim([0,30]);
         end
-
-        tbl = tbl(tbl.result=='CORRECT' & tbl.jump==-1,:);
-    
-        spks1 = cellfun(@(r) cellfun(@(q) numel(q), r, 'uni', 1), tbl.spiketimes_1, 'uni', 0);
-        spks1 = cellfun(@(q,v) (q./v)*1000, spks1, num2cell(tbl.END_TRIAL), 'uni', 0);
-    
-        if ismember('spiketimes_2',tbl.Properties.VariableNames)
-            spks2 = cellfun(@(r) cellfun(@(q) numel(q), r, 'uni', 1), tbl.spiketimes_2, 'uni', 0);
-            spks2 = cellfun(@(q,v) (q./v)*1000, spks2, num2cell(tbl.END_TRIAL), 'uni', 0);
-    
-            spks = [vertcat(spks1{:}) vertcat(spks2{:})];
-        else
-            spks = vertcat(spks1{:});
-        end
-    
-        mask = (spks >= (mean(spks, 1) - 3*std(spks, 0, 1))) & (spks <= (mean(spks, 1) + 3*std(spks, 0, 1)));
-        tbl = tbl((sum(mask,2) < (mean(sum(mask,2)) + std(sum(mask,2))*3)) & (sum(mask,2) > (mean(sum(mask,2)) - std(sum(mask,2))*3)), :);
-    
-        eyePos = cellfun(@(x) filterEyeTraces_EyeLink(x), tbl.eyedata, 'uni', 0);
-        [eyeVel, eyeAcc] = cellfun(@(x) calcDerivative_eyeTraces(x), eyePos, 'uni', 0);
-    
-        tbl.eyePos = eyePos; tbl.eyeVel = eyeVel; tbl.eyeAcc = eyeAcc;
-
-        saccades = cellfun(@(q) detect_saccades(q, 'VEL_THRESH', 30, 'ACC_THRESH', 500), cellfun(@(v,f) v(:,f(1):end), eyeVel, num2cell(tbl.FIXATE), 'uni', 0), 'uni', 0);
-        tbl.saccades = cellfun(@(q,v) num2cell(q+v(1),2), saccades, num2cell(tbl.FIXATE), 'uni', 0);
-
-        [pursuitOnset, pursuitLatency] = cellfun(@(u,v,w) detect_pursuitOnset(u, v, w, 'PLOT_TRACES', false), tbl.eyeVel, num2cell(tbl.PURSUIT_TARG_ON), num2cell(tbl.pursuitSpeed), 'uni', 1); 
-        tbl.pursuitOnset = pursuitOnset;
-        tbl.pursuitLatency = pursuitLatency;
-
-        tbl = tbl(tbl.pursuitLatency >= 60 & tbl.pursuitLatency < 150,:);
-
-        csTrials = cellfun(@(u,v) sum(((cellfun(@(q) q(2), u, 'uni', 1) - (v)) >= 0) & ((cellfun(@(q) q(1), u, 'uni', 1) - (v+tbl.params(1).block.crossingTime)) < 150)), tbl.saccades, num2cell(tbl.PURSUIT_TARG_ON), 'uni', 1);
-        tbl.pursType = repmat(categorical("sacc"),height(tbl),1);
-        tbl.pursType(~logical(csTrials)) = "pure";
-
-        [~,rVel] = cellfun(@(q) cart2pol(q(1,:),q(2,:)), tbl.eyeVel, 'uni', 0);
-        rVel = cellfun(@(u,v) u(v+50:v+200), rVel, num2cell(tbl.pursuitOnset), 'uni', 0);
-        tbl = tbl(cellfun(@(q,v) min(q) > 0.3*v, rVel, num2cell(tbl.pursuitSpeed), 'uni', 1),:);
-
-        % f = figure;
-        % [~,rVel] = cellfun(@(q) cart2pol(q(1,:),q(2,:)), tbl.eyeVel, 'uni', 0);
-        % rVel = cellfun(@(u,v) u(v-100:v+300), rVel, num2cell(tbl.pursuitOnset), 'uni', 0);
-        % rVel = cellfun(@(x) filterEyeTraces_EyeLink(x,'CUTOFF_FREQUENCY', 20), rVel, 'uni', 0);
-        % 
-        % x = [0:400]-100;
-        % xline(0,'k--');
-        % hold on;
-        % for t = 1:height(tbl)
-        %     plot(x,rVel{t},'k-')
-        % end
-        % ylim([0,30]);
 
         S.(matchingFields{f}).tbl = tbl;
     end
