@@ -9,7 +9,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mail-type=fail
 #SBATCH --mail-user=knoneman@pitt.edu
-#SBATCH --time=0-00:59:59
+#SBATCH --time=0-02:59:59
 #SBATCH --array=0-49
 
 echo "My SLURM_ARRAY_JOB_ID is $SLURM_ARRAY_JOB_ID."
@@ -56,7 +56,8 @@ print(profile_to_mat(
 echo "SORTER_PATH    =  '$SORTER_PATH'"
 echo "======================================================"
 
-DATA_PATH="${RAW_DATA_PATH}/${SESSION}/tables/${SESSION}-${PROTOCOL}.mat"
+#DATA_PATH="${RAW_DATA_PATH}/${SESSION}/tables/${SESSION}-${PROTOCOL}.mat"
+DATA_PATH="${RAW_DATA_PATH}/${SESSION}/tables/${SESSION}-${SORTER_PATH}.mat"
 FIG_PATH="${RAW_DATA_PATH}/${SESSION}/figs/${SORTER_PATH}/"
 
 echo "DATA_PATH: $DATA_PATH"
@@ -190,3 +191,5 @@ EOF
 
 ####################################################################
 echo "DONE"
+crc-job-stats
+
