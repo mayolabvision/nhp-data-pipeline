@@ -14,6 +14,7 @@
 
 # ----- Load environment -----
 module purge
+module load matlab/R2024a
 module load python/ondemand-jupyter-python3.11
 
 ENV_PATH=$(python -c "import config; print(config.ENV_PATH)")

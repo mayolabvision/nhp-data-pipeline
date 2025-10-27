@@ -2,12 +2,13 @@ import json
 from pathlib import Path
 from datetime import date
 from .neuropixel import NeuropixelProfile
+from .plexon import PlexonProfile
 from config import RAW_DATA_PATH, PROTOCOLS_PATH
 
 # Mapping from probe_type to class
 RECORDING_PROFILE_MAP = {
     "neuropixel": NeuropixelProfile,
-    # add others as needed
+    "plexon": PlexonProfile
 }
 
 def get_recording_profile(session, probe_id):
@@ -20,7 +21,6 @@ def get_recording_profile(session, probe_id):
         metadata = json.load(f)
 
     probe_type = metadata["probe_type"][probe_id]
-    #print(f"Detected probe type: {probe_type}")
 
     try:
         return RECORDING_PROFILE_MAP[probe_type.lower()]
