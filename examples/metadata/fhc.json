@@ -1,9 +1,9 @@
 {
   "sess_name": "experimenter_monkey_0000a",
-  "probe_label": ["left_FEF"],
+  "probe_label": ["lFEF"],
   "probe_type": ["fhc"],
   "probe_config": ["125um"],
-  "hardware_config": ["elec-A"],
+  "hardware_config": ["elecA"],
   "probe_depth_mm": [[0.0,1.0,2.0,3.0]],
   "probe_gridHole": [["a1","m1"]],
 

@@ -1,6 +1,6 @@
 {
   "sess_name": "experimenter_monkey_0000a",
-  "probe_label": ["left_FEF"],
+  "probe_label": ["lFEF"],
   "probe_type": ["neuropixel"],
   "probe_config": ["nhp_long_1.0"],
   "hardware_config": ["imec0"],

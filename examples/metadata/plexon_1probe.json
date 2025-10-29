@@ -1,9 +1,9 @@
 {
-  "sess_name": "kendra_scrappy_0000a",
-  "probe_label": ["left_FEF"],
+  "sess_name": "experimenter_monkey_0000a",
+  "probe_label": ["lFEF"],
   "probe_type": ["plexon"],
   "probe_config": ["sProbe_24chan_150umSpacing_750umToTip"],
-  "hardware_config": ["elec-A"],
+  "hardware_config": ["elecA"],
   "probe_depth_mm": [0.0],
   "probe_gridHole": [["a1","m1"]],
 
