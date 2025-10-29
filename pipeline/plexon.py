@@ -1,6 +1,7 @@
 import numpy as np
 from pathlib import Path
 import pandas as pd
+from scipy.io import loadmat
 import os
 import json
 
@@ -11,8 +12,6 @@ warnings.filterwarnings("ignore", category=pd.errors.SettingWithCopyWarning)
 
 from .base import RecordingProfile
 from config import RAW_DATA_PATH
-from .catgt_utils import run_catgt
-from .SGLXMetaToCoords import MetaToCoords
 from .path_utils import get_preprocess_hash, get_motion_hash, save_params, get_sorter_hash
 from .si_tools import run_preprocessing_with_motion_correction, run_preprocessing_without_motion_correction, save_processed_recording, detect_excessive_motion
 from .si_tools import find_missing_extensions, add_extension_arrays_to_metrics
@@ -22,18 +21,21 @@ from .ks_tools import convert_npy_to_mat, get_best_channels
 from spikeinterface.sorters import run_sorter
 from spikeinterface.core import load, BaseRecording
 from spikeinterface import create_sorting_analyzer, load_sorting_analyzer
-from spikeinterface.extractors import get_neo_streams, read_spikeglx
+from spikeinterface.extractors import read_binary
 from spikeinterface.qualitymetrics import compute_quality_metrics
 
-class NeuropixelProfile(RecordingProfile):
-    def prep_session_data(self):
-        self.data_path = Path(RAW_DATA_PATH) / self.session / f"{self.session}_imec{self.probe_id}"
+from probeinterface.generator import generate_linear_probe
 
-        #run_catgt(self.session, Path(RAW_DATA_PATH))
-        #self.probe_path = self.data_path / f"{self.session}_t0.imec{self.probe_id}.ap_kilosortChanMap.mat"
-        #self.num_channels = 384       
+class PlexonProfile(RecordingProfile):
+    def prep_session_data(self):
+        # Pull out raw data and save to sub-folder for each probe
+        self.data_path = Path(RAW_DATA_PATH) / self.session / f"{self.metadata['hardware_config'][self.probe_id]}_{self.metadata['probe_label'][self.probe_id]}"
+        self.probe_path = self.data_path / "prb.mat"
+       
+        prb = loadmat(self.probe_path)
+        self.num_channels = int(len(prb['chanMap']))
  
-        self.preprocess_hash = get_preprocess_hash(self.protocol["motion_screening"])    
+        self.preprocess_hash = get_preprocess_hash(self.protocol["motion_screening"] | self.protocol["preprocessing"])    
         self.pp_hash, self.motion_hash, self.pp_params, self.motion_params = get_motion_hash(self.protocol['motion_correction'])
         self.preprocess_path = self.data_path / "preprocess" / self.preprocess_hash / self.pp_hash / self.motion_hash
         save_params(self.preprocess_path.parent.parent / "params.json", self.protocol['preprocessing'])
@@ -49,11 +51,11 @@ class NeuropixelProfile(RecordingProfile):
         self.tbl_path = self.data_path.parent / "tables" / f"{self.session}-{self.full_hash}.mat"
         self.figs_path = self.data_path.parent / "figs" / self.full_hash / f"{self.metadata['hardware_config'][self.probe_id]}_{self.metadata['probe_label'][self.probe_id]}"
         save_params(self.figs_path / "params.json", self.protocol)
-
+    
     def motion_screening(self):
         if self.protocol["motion_screening"]["enabled"]:
-            stream_names, stream_ids = get_neo_streams('spikeglx', self.data_path)
-            raw_recording = read_spikeglx(self.data_path, stream_name=f'imec{self.probe_id}.ap', load_sync_channel=False)
+            raw_recording = read_binary(file_paths=self.data_path / "raw.bin", num_channels=self.num_channels, 
+                                        sampling_frequency=30000, dtype="float64", time_axis=1)
             
             cutoff_time_sec = detect_excessive_motion(raw_recording, self.preprocess_path, 
                                                       threshold_um=self.protocol['motion_screening']['motion_thresh_um'],
@@ -68,8 +70,8 @@ class NeuropixelProfile(RecordingProfile):
 
     def preprocessing(self):
         if not (self.preprocess_path / 'params.json').is_file(): 
-            stream_names, stream_ids = get_neo_streams('spikeglx', self.data_path)
-            raw_recording = read_spikeglx(self.data_path, stream_name=f'imec{self.probe_id}.ap', load_sync_channel=False)
+            raw_recording = read_binary(file_paths=self.data_path / "raw.bin", num_channels=self.num_channels, 
+                                        sampling_frequency=30000, dtype="float64", time_axis=1)
            
             print("Duration of raw recording (min):", round((raw_recording.get_num_samples(segment_index=0)/raw_recording.get_sampling_frequency())/60))
             trim_recording = raw_recording.frame_slice(start_frame=0, end_frame=self.cutoff_frame)

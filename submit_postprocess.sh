@@ -1,11 +1,11 @@
 #!/bin/bash -l
 #SBATCH --nodes=1
-#SBATCH --time=0-16:00:00
+#SBATCH --time=0-23:59:59
 #SBATCH --cluster=smp
 #SBATCH --partition=high-mem
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
-#SBATCH --job-name=preproc
+#SBATCH --job-name=postproc
 #SBATCH --error=/ix1/pmayo/outfiles/out_%A_%a.out
 #SBATCH --output=/ix1/pmayo/outfiles/out_%A_%a.out
 #SBATCH --mail-type=done,fail
@@ -14,7 +14,6 @@
 
 # ----- Load environment -----
 module purge
-module load matlab/R2023a
 module load python/ondemand-jupyter-python3.11
 
 ENV_PATH=$(python -c "import config; print(config.ENV_PATH)")
@@ -28,43 +27,23 @@ PROTOCOL="${2:-np-nodrift-ks4_wr12}"
 
 PROBE_ID=$SLURM_ARRAY_TASK_ID
 
-echo "SESSION    =  $SESSION"
+echo "SESSION    =  '$SESSION'"
 echo "PROBE_ID   =  $PROBE_ID"
 echo "PROTOCOL   =  $PROTOCOL"
+echo "ENV_PATH   =  '$ENV_PATH'"
 
 echo "======================================================"
 
 #################################################################
-################ Check that raw signal exists ###################
-NEV_PATH=$(python -c "import config; print(config.NEVUTIL_PATH)")
+####################### RUN SI Sorting ##########################
 
-RAW_DATA_PATH=$(python -c "import config; print(config.RAW_DATA_PATH)")
-PROBES_PATH=$(python -c "import config; print(config.PROBES_PATH)")
-DATA_PATH="${RAW_DATA_PATH}/${SESSION}"
-
-MATLAB_PROBE_ID=$((PROBE_ID + 1))
-
-echo "Checking raw signal exists........................"
-matlab -nodisplay <<EOF
-addpath(genpath('matlab'));
-addpath(genpath('${NEV_PATH}'));
-fprintf('Running rawRipple_to_binaryFile for $1\n');
-rawRipple_to_binaryFile('${DATA_PATH}', ${MATLAB_PROBE_ID}, '${PROBES_PATH}');
-exit
-EOF
-
-echo "======================================================"
-
-#################################################################
-##################### RUN SI (PP + Sort) ########################
-
-echo "Running preprocessing pipeline........................"
+echo "Running postprocessing pipeline........................"
 $CONDA_PREFIX/bin/python -c "
-from main_pipeline import run_preprocess
+from main_pipeline import run_postprocess
 
-run_preprocess(
+run_postprocess(
     '${SESSION}', 
-    probe_id=int('${PROBE_ID}'),
+    probe_id=int('$PROBE_ID'),
     protocol='${PROTOCOL}.json' 
 )"
 

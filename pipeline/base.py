@@ -11,10 +11,12 @@ class RecordingProfile(ABC):
         self.session = session
         self.probe_id = probe_id
         self.protocol_path = protocol_path
+        self.num_channels = None
         self.protocol = None
         self.data_path = None
         self.metadata = None
         self.probe_path = None
+        self.cutoff_frame = None
         self.preprocess_hash = None
         self.preprocess_path = None
         self.motion_hash = None
@@ -25,6 +27,8 @@ class RecordingProfile(ABC):
         self.full_hash = None
         self.analyzer_path = None
         self.metrics_path = None
+        self.tbl_path = None
+        self.figs_path = None
 
     def load_metadata(self):
         """Load metadata.json for this session."""
@@ -43,8 +47,8 @@ class RecordingProfile(ABC):
         return self
 
     @abstractmethod
-    def make_probe_map(self):
-        """Check and prepare raw data for processing."""
+    def motion_screening(self):
+        """Applying motion screening to raw recording."""
         pass
 
     @abstractmethod
@@ -66,4 +70,4 @@ class RecordingProfile(ABC):
     def quality_metrics(self):
         """Calculate quality metrics from sorting_analyzer."""
         pass
- 
+    
