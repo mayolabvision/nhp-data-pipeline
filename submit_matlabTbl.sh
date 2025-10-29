@@ -19,10 +19,6 @@ module load python/ondemand-jupyter-python3.11
 ENV_PATH=$(python -c "import config; print(config.ENV_PATH)")
 source activate "$ENV_PATH"
 
-RAW_DATA_PATH=$(python -c "import config; print(config.RAW_DATA_PATH)")
-OUT_DATA_PATH=$(python -c "import config; print(config.RAW_DATA_PATH)")
-NEV_PATH=$(python -c "import config; print(config.NEVUTIL_PATH)")
-
 # ----- Specify inputs -----
 echo "======================================================"
 

@@ -11,6 +11,7 @@ class RecordingProfile(ABC):
         self.session = session
         self.probe_id = probe_id
         self.protocol_path = protocol_path
+        self.num_channels = None
         self.protocol = None
         self.data_path = None
         self.metadata = None
@@ -45,11 +46,6 @@ class RecordingProfile(ABC):
         """Check and prepare raw data for processing."""
         return self
 
-    @abstractmethod
-    def make_probe_map(self):
-        """Check and prepare raw data for processing."""
-        pass
-    
     @abstractmethod
     def motion_screening(self):
         """Applying motion screening to raw recording."""

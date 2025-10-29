@@ -14,7 +14,7 @@
 
 # ----- Load environment -----
 module purge
-module load matlab/R2024a
+module load matlab/R2023a
 module load python/ondemand-jupyter-python3.11
 
 ENV_PATH=$(python -c "import config; print(config.ENV_PATH)")
@@ -31,6 +31,27 @@ PROBE_ID=$SLURM_ARRAY_TASK_ID
 echo "SESSION    =  $SESSION"
 echo "PROBE_ID   =  $PROBE_ID"
 echo "PROTOCOL   =  $PROTOCOL"
+
+echo "======================================================"
+
+#################################################################
+################ Check that raw signal exists ###################
+NEV_PATH=$(python -c "import config; print(config.NEVUTIL_PATH)")
+
+RAW_DATA_PATH=$(python -c "import config; print(config.RAW_DATA_PATH)")
+PROBES_PATH=$(python -c "import config; print(config.PROBES_PATH)")
+DATA_PATH="${RAW_DATA_PATH}/${SESSION}"
+
+MATLAB_PROBE_ID=$((PROBE_ID + 1))
+
+echo "Checking raw signal exists........................"
+matlab -nodisplay <<EOF
+addpath(genpath('matlab'));
+addpath(genpath('${NEV_PATH}'));
+fprintf('Running rawRipple_to_binaryFile for $1\n');
+rawRipple_to_binaryFile('${DATA_PATH}', ${MATLAB_PROBE_ID}, '${PROBES_PATH}');
+exit
+EOF
 
 echo "======================================================"
 

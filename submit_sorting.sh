@@ -11,7 +11,7 @@
 #SBATCH --output=/ix1/pmayo/outfiles/out_%A_%a.out
 #SBATCH --mail-type=done,fail
 #SBATCH --mail-user=knoneman@pitt.edu
-#SBATCH --array=0-1
+#SBATCH --array=0
 
 # ----- Load environment -----
 module purge

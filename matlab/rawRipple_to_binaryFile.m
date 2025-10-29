@@ -10,6 +10,10 @@ if ~isequal(metadata.probe_type{probe_id},'plexon')
 end
 
 prb_folder = fullfile(data_path, sprintf('%s_%s',metadata.hardware_config{probe_id},metadata.probe_label{probe_id}));
+if exist(fullfile(prb_folder,'prb.mat'), 'file')
+    return
+end
+
 if ~exist(prb_folder,'dir')
     mkdir(prb_folder);
 end
@@ -74,10 +78,11 @@ for nevnum = 1:length(nevnames)
                 these_chans = (prb.chanMap+385)-1;
             end
 
+            % Channels x samples
             this_ns5 = out_ns5.data(ismember(out_ns5.hdr.label, string(these_chans)),:);
 
             fid_write = fopen(full_bin_path, 'a'); % Open file in append mode ('a')
-            fwrite(fid_write, this_ns5, 'int16');
+            fwrite(fid_write, this_ns5, 'double');
 
             fclose(fid_write);  
         else

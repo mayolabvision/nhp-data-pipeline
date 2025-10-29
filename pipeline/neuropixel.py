@@ -29,10 +29,11 @@ class NeuropixelProfile(RecordingProfile):
     def prep_session_data(self):
         self.data_path = Path(RAW_DATA_PATH) / self.session / f"{self.session}_imec{self.probe_id}"
 
-        run_catgt(self.session, Path(RAW_DATA_PATH))
-        self.probe_path = self.data_path / f"{self.session}_t0.imec{self.probe_id}.ap_kilosortChanMap.mat"
-        
-        self.preprocess_hash = get_preprocess_hash(self.protocol["motion_screening"] | self.protocol["preprocessing"])    
+        #run_catgt(self.session, Path(RAW_DATA_PATH))
+        #self.probe_path = self.data_path / f"{self.session}_t0.imec{self.probe_id}.ap_kilosortChanMap.mat"
+        #self.num_channels = 384       
+ 
+        self.preprocess_hash = get_preprocess_hash(self.protocol["motion_screening"])    
         self.pp_hash, self.motion_hash, self.pp_params, self.motion_params = get_motion_hash(self.protocol['motion_correction'])
         self.preprocess_path = self.data_path / "preprocess" / self.preprocess_hash / self.pp_hash / self.motion_hash
         save_params(self.preprocess_path.parent.parent / "params.json", self.protocol['preprocessing'])
@@ -49,11 +50,6 @@ class NeuropixelProfile(RecordingProfile):
         self.figs_path = self.data_path.parent / "figs" / self.full_hash / f"{self.metadata['hardware_config'][self.probe_id]}_{self.metadata['probe_label'][self.probe_id]}"
         save_params(self.figs_path / "params.json", self.protocol)
 
-    def make_probe_map(self):
-        if not self.probe_path.exists():
-            MetaToCoords(self.probe_path.parent / f"{self.session}_t0.imec{self.probe_id}.ap.meta",
-                         1, badChan=np.zeros((0), dtype='int'), destFullPath='', showPlot=True)
-    
     def motion_screening(self):
         if self.protocol["motion_screening"]["enabled"]:
             stream_names, stream_ids = get_neo_streams('spikeglx', self.data_path)

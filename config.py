@@ -6,7 +6,8 @@ PROBES_PATH = "/ix1/pmayo/probe_maps"
 
 NEVUTIL_PATH="/ix1/pmayo/packages/nevutils"
 NASNET_PATH="/ix1/pmayo/packages/nasnet"
-HELPERS_PATH="/ihome/pmayo/knoneman/HelperFunctions"
+HELPERS_PATH="/ix1/pmayo/packages/HelperFunctions"
+CATGT_PATH="/ix1/pmayo/packages/CatGT-linux"
 
 # Central config for data path
 RAW_DATA_PATH = Path("/ix1/pmayo/lab_NHPdata")
