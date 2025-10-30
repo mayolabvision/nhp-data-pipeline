@@ -2,7 +2,7 @@ from pathlib import Path
 
 ENV_PATH = "/ix1/pmayo/envs/NHPipe"
 PROTOCOLS_PATH = "/ix1/pmayo/protocols"
-PROBES_PATH = "/ix1/pmayo/probe_maps"
+PROBES_PATH = "/ix1/pmayo/probes"
 
 NEVUTIL_PATH="/ix1/pmayo/packages/nevutils"
 NASNET_PATH="/ix1/pmayo/packages/nasnet"
