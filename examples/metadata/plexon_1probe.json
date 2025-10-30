@@ -2,10 +2,12 @@
   "sess_name": "experimenter_monkey_0000a",
   "probe_label": ["lFEF"],
   "probe_type": ["plexon"],
-  "probe_config": ["sProbe_24chan_150umSpacing_750umToTip"],
+  "probe_config": ["PLX-VP-16-15ED-150-SE-185-CON_32m-V-85-40_640-CT-500"],
   "hardware_config": ["elecA"],
   "probe_depth_mm": [0.0],
   "probe_gridHole": [["a1","m1"]],
 
   "HEeye_VEeye_diode_pupil": ["10241","10242","10243","10244"]
 }
+
+
