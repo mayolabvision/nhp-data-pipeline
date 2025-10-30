@@ -1,29 +1,22 @@
-function rawRipple_to_binaryFile(data_path,probe_id,probes_path)
+function rawRipple_to_binaryFile(data_path,probes_path)
 %UNTITLED Summary of this function goes here
 %   Detailed explanation goes here
 
 json_text = fileread(fullfile(data_path,'metadata.json'));
 metadata = jsondecode(json_text);
 
-if ~isequal(metadata.probe_type{probe_id},'plexon')
+pr_configs = metadata.probe_config(cellfun(@(q) isequal(q,'plexon'), metadata.probe_type));
+hw_configs = metadata.hardware_config(cellfun(@(q) isequal(q,'plexon'), metadata.probe_type));
+
+num_probes = numel(pr_configs);
+if num_probes == 0
     return
 end
 
-prb_folder = fullfile(data_path, sprintf('%s_%s',metadata.hardware_config{probe_id},metadata.probe_label{probe_id}));
-if exist(fullfile(prb_folder,'prb.mat'), 'file')
-    return
-end
-
-if ~exist(prb_folder,'dir')
-    mkdir(prb_folder);
-end
-
-full_bin_path = fullfile(prb_folder, 'raw.bin'); 
+full_bin_path = fullfile(data_path,[metadata.sess_name,'.bin']); 
 if exist(full_bin_path, 'file') == 2
-    delete(full_bin_path);
+    return
 end
-
-prb = load(fullfile(probes_path,[metadata.probe_config{probe_id} '.mat']));
 
 filePattern = fullfile(data_path, '*.ns5');
 raw_files = dir(filePattern);
@@ -59,27 +52,34 @@ for i = 1:numel(nevnames)
         tasks{i} = 'unknown';
     end
 end
-%disp(tasks)
 
 for nevnum = 1:length(nevnames)
     nevpath = nevpaths{nevnum};
     this_task = tasks{nevnum};
 
     if ~contains(this_task,'fstm')
+        fprintf('\n---- loading raw signal for %s ----\n', this_task);
         [~, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', false, 'READ_LFP', false);
-        if ~isempty(out_ns5.data(ismember(out_ns5.hdr.label, string(1:512)),1))
-            if isequal(metadata.hardware_config{probe_id},"elecA")
-                these_chans = prb.chanMap;
-            elseif isequal(metadata.hardware_config{probe_id},"elecB")
-                these_chans = (prb.chanMap+129)-1;
-            elseif isequal(metadata.hardware_config{probe_id},"elecC")
-                these_chans = (prb.chanMap+257)-1;
-            elseif isequal(metadata.hardware_config{probe_id},"elecD")
-                these_chans = (prb.chanMap+385)-1;
-            end
 
-            % Channels x samples
-            this_ns5 = out_ns5.data(ismember(out_ns5.hdr.label, string(these_chans)),:);
+        if ~isempty(out_ns5.data(ismember(out_ns5.hdr.label, string(1:512)),1))
+            this_ns5 = [];
+            for p = 1:num_probes
+                this_prb = load(fullfile(probes_path,[pr_configs{p},'.mat']));
+                this_hw = hw_configs{p};
+
+                if isequal(this_hw,"elecA")
+                    these_chans = this_prb.chanMap;
+                elseif isequal(this_hw,"elecB")
+                    these_chans = this_prb.chanMap+128;
+                elseif isequal(this_hw,"elecC")
+                    these_chans = this_prb.chanMap+256;
+                elseif isequal(this_hw,"elecD")
+                    these_chans = this_prb.chanMap+384;
+                end
+
+                % Channels x samples
+                this_ns5 = [this_ns5; out_ns5.data(ismember(out_ns5.hdr.label, string(these_chans)),:)];
+            end
 
             fid_write = fopen(full_bin_path, 'a'); % Open file in append mode ('a')
             fwrite(fid_write, this_ns5, 'double');
@@ -87,19 +87,11 @@ for nevnum = 1:length(nevnames)
             fclose(fid_write);  
         else
             fprintf('\n---- no raw signal for %s ----\n', this_task);
+            delete(full_bin_path);
+            return
         end
 
     end
 end
-
-% Save new probe map to data_path, with correct channels
-prb.chanMap = (1:size(this_ns5,1))';
-prb.chanMap0ind = prb.chanMap - 1;
-
-chanMap = prb.chanMap; chanMap0ind = prb.chanMap0ind; connected = prb.connected; 
-kcoords = prb.kcoords; name = prb.name; xcoords = prb.xcoords; ycoords = prb.ycoords; 
-
-new_prb_path = fullfile(prb_folder, 'prb.mat');
-save(new_prb_path,"chanMap","chanMap0ind","connected","kcoords","name","xcoords","ycoords");
 
 end
