@@ -11,7 +11,7 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore", category=pd.errors.SettingWithCopyWarning)
 
 from .base import RecordingProfile
-from config import RAW_DATA_PATH
+from config import RAW_DATA_PATH, PROBES_PATH
 from .path_utils import get_preprocess_hash, get_motion_hash, save_params, get_sorter_hash
 from .si_tools import run_preprocessing_with_motion_correction, run_preprocessing_without_motion_correction, save_processed_recording, detect_excessive_motion
 from .si_tools import find_missing_extensions, add_extension_arrays_to_metrics
@@ -24,16 +24,15 @@ from spikeinterface import create_sorting_analyzer, load_sorting_analyzer
 from spikeinterface.extractors import read_binary
 from spikeinterface.qualitymetrics import compute_quality_metrics
 
-from probeinterface.generator import generate_linear_probe
+from ripple_probe_maker import combine_probes
 
 class PlexonProfile(RecordingProfile):
     def prep_session_data(self):
         # Pull out raw data and save to sub-folder for each probe
-        self.data_path = Path(RAW_DATA_PATH) / self.session / f"{self.metadata['hardware_config'][self.probe_id]}_{self.metadata['probe_label'][self.probe_id]}"
-        self.probe_path = self.data_path / "prb.mat"
-       
-        prb = loadmat(self.probe_path)
-        self.num_channels = int(len(prb['chanMap']))
+        self.data_path = Path(RAW_DATA_PATH) / self.session
+        
+        self.probe_path = self.data_path / f"{self.session}_prbMap.json"
+        self.num_channels = combine_probes(self.data_path, PROBES_PATH)
  
         self.preprocess_hash = get_preprocess_hash(self.protocol["motion_screening"] | self.protocol["preprocessing"])    
         self.pp_hash, self.motion_hash, self.pp_params, self.motion_params = get_motion_hash(self.protocol['motion_correction'])
