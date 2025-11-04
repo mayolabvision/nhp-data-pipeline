@@ -13,9 +13,9 @@ warnings.filterwarnings("ignore", category=pd.errors.SettingWithCopyWarning)
 from .base import RecordingProfile
 from config import RAW_DATA_PATH, PROBES_PATH
 from .path_utils import get_preprocess_hash, get_motion_hash, save_params, get_sorter_hash
-from .si_tools import run_preprocessing_with_motion_correction, run_preprocessing_without_motion_correction, save_processed_recording, detect_excessive_motion
+from .si_tools import run_preprocessing_with_motion_correction, run_preprocessing_without_motion_correction, save_processed_recording, detect_probe_motion
 from .si_tools import find_missing_extensions, add_extension_arrays_to_metrics
-from .si_plots import plot_motion_screening, plot_preprocessing_steps, plot_probe_peaks, plot_noise_levels, plot_motion_correction_traces
+from .si_plots import plot_probe_motion, plot_preprocessing_steps, plot_probe_peaks, plot_noise_levels, plot_motion_correction_traces
 from .ks_tools import convert_npy_to_mat, get_best_channels
 
 from spikeinterface.sorters import run_sorter
@@ -24,7 +24,7 @@ from spikeinterface import create_sorting_analyzer, load_sorting_analyzer
 from spikeinterface.extractors import read_binary
 from spikeinterface.qualitymetrics import compute_quality_metrics
 
-from ripple_probe_maker import combine_probes
+#from ripple_probe_maker import combine_probes
 
 class PlexonProfile(RecordingProfile):
     def prep_session_data(self):
@@ -51,22 +51,6 @@ class PlexonProfile(RecordingProfile):
         self.figs_path = self.data_path.parent / "figs" / self.full_hash / f"{self.metadata['hardware_config'][self.probe_id]}_{self.metadata['probe_label'][self.probe_id]}"
         save_params(self.figs_path / "params.json", self.protocol)
     
-    def motion_screening(self):
-        if self.protocol["motion_screening"]["enabled"]:
-            raw_recording = read_binary(file_paths=self.data_path / "raw.bin", num_channels=self.num_channels, 
-                                        sampling_frequency=30000, dtype="float64", time_axis=1)
-            
-            cutoff_time_sec = detect_excessive_motion(raw_recording, self.preprocess_path, 
-                                                      threshold_um=self.protocol['motion_screening']['motion_thresh_um'],
-                                                      min_duration_sec=self.protocol['motion_screening']['min_duration_sec'])
-            self.cutoff_frame = None if cutoff_time_sec is None else int(cutoff_time_sec * raw_recording.get_sampling_frequency())
-
-            if not (self.figs_path / "motion_screening.png").is_file():             
-                plot_motion_screening(self, cutoff_time_sec)
-                print(f"===== motion screening plotted =====")
-        else:
-            self.cutoff_frame = None
-
     def preprocessing(self):
         if not (self.preprocess_path / 'params.json').is_file(): 
             raw_recording = read_binary(file_paths=self.data_path / "raw.bin", num_channels=self.num_channels, 

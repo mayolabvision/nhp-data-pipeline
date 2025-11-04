@@ -1,5 +1,7 @@
 # main_pipeline.py
 from pathlib import Path
+import os
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
 from pipeline import get_recording_profile, save_protocol_to_dict
 from config import PROTOCOLS_PATH
@@ -20,13 +22,6 @@ def run_preprocess(session, probe_id=0, protocol=None):
     print(f"preprocess_hash  =  {profile.preprocess_hash}")
     print(f"motion_hash      =  {profile.motion_hash}")
     
-    profile.make_probe_map()
-    print(f"-------------- ✓ Probe map generated --------------")
-    
-    profile.motion_screening()
-    print(f"cutoff_frame      =  {profile.cutoff_frame}")
-    print(f"----------- ✓ Motion screening complete -----------")
-
     profile.preprocessing()
     print(f"------------ ✓ Preprocessing complete -------------")
     
