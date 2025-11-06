@@ -11,7 +11,7 @@
 #SBATCH --output=/ix1/pmayo/outfiles/out_%A_%a.out
 #SBATCH --mail-type=done,fail
 #SBATCH --mail-user=knoneman@pitt.edu
-#SBATCH --array=0
+#SBATCH --array=0-1
 
 # ----- Load environment -----
 module purge
@@ -24,8 +24,8 @@ source activate "$ENV_PATH"
 echo "======================================================"
 
 SESSION="${1}"
+PROTOCOL="${2:-np-ks4}"
 PROBE_ID=$SLURM_ARRAY_TASK_ID
-PROTOCOL="${2:-np-nodrift-ks4_wr12}"
 
 echo "SESSION    =  $SESSION"
 echo "PROBE_ID   =  $PROBE_ID"

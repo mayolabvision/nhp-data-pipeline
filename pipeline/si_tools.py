@@ -37,10 +37,12 @@ def load_or_compute_peaks(preprocess_path, recording, protocol):
     return peaks, peak_locations
 
 def detect_probe_motion(recording, save_path):
+    depths = recording.get_channel_locations()
+    max_depth = int(depths.max(axis=0)[1])
     motion = compute_motion(recording, preset="medicine", 
                         detect_kwargs={'method':'locally_exclusive'}, 
                         localize_peaks_kwargs={'method': 'monopolar_triangulation'},
-                        estimate_motion_kwargs={'win_scale_um': 1000, 'motion_bound':800, 'time_kernel_width': 60})
+                        estimate_motion_kwargs={'win_scale_um': max_depth, 'motion_bound':800, 'time_kernel_width': 60})
 
     np.save(save_path / 'medicine_motion.npy', motion.displacement[0])
     np.save(save_path / 'medicine_time_bins.npy', motion.temporal_bins_s[0])

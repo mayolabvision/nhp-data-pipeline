@@ -82,7 +82,7 @@ for nevnum = 1:length(nevnames)
             end
 
             fid_write = fopen(full_bin_path, 'a'); % Open file in append mode ('a')
-            fwrite(fid_write, this_ns5, 'double');
+            fwrite(fid_write, this_ns5', 'double');
 
             fclose(fid_write);  
         else

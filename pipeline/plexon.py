@@ -24,7 +24,8 @@ from spikeinterface import create_sorting_analyzer, load_sorting_analyzer
 from spikeinterface.extractors import read_binary
 from spikeinterface.qualitymetrics import compute_quality_metrics
 
-#from ripple_probe_maker import combine_probes
+from .ripple_probe_maker import combine_probes
+from probeinterface.io import read_probeinterface
 
 class PlexonProfile(RecordingProfile):
     def prep_session_data(self):
@@ -34,7 +35,7 @@ class PlexonProfile(RecordingProfile):
         self.probe_path = self.data_path / f"{self.session}_prbMap.json"
         self.num_channels = combine_probes(self.data_path, PROBES_PATH)
  
-        self.preprocess_hash = get_preprocess_hash(self.protocol["motion_screening"] | self.protocol["preprocessing"])    
+        self.preprocess_hash = get_preprocess_hash(self.protocol["preprocessing"])    
         self.pp_hash, self.motion_hash, self.pp_params, self.motion_params = get_motion_hash(self.protocol['motion_correction'])
         self.preprocess_path = self.data_path / "preprocess" / self.preprocess_hash / self.pp_hash / self.motion_hash
         save_params(self.preprocess_path.parent.parent / "params.json", self.protocol['preprocessing'])
@@ -47,40 +48,32 @@ class PlexonProfile(RecordingProfile):
         self.analyzer_path = self.sorter_path / 'analyzer'
         self.metrics_path = self.sorter_path / 'quality_metrics'
         
-        self.tbl_path = self.data_path.parent / "tables" / f"{self.session}-{self.full_hash}.mat"
-        self.figs_path = self.data_path.parent / "figs" / self.full_hash / f"{self.metadata['hardware_config'][self.probe_id]}_{self.metadata['probe_label'][self.probe_id]}"
+        self.tbl_path = self.data_path / "tables" / f"{self.session}-{self.full_hash}.mat"
+        self.figs_path = self.data_path / "figs" / self.full_hash / f"{self.metadata['hardware_config'][self.probe_id]}_{self.metadata['probe_label'][self.probe_id]}"
         save_params(self.figs_path / "params.json", self.protocol)
     
     def preprocessing(self):
         if not (self.preprocess_path / 'params.json').is_file(): 
-            raw_recording = read_binary(file_paths=self.data_path / "raw.bin", num_channels=self.num_channels, 
+            raw_recording = read_binary(file_paths=self.data_path / f"{self.session}.bin", num_channels=self.num_channels, 
                                         sampling_frequency=30000, dtype="float64", time_axis=1)
            
-            print("Duration of raw recording (min):", round((raw_recording.get_num_samples(segment_index=0)/raw_recording.get_sampling_frequency())/60))
-            trim_recording = raw_recording.frame_slice(start_frame=0, end_frame=self.cutoff_frame)
-            print("Duration of trimmed recording (min):", round((trim_recording.get_num_samples(segment_index=0)/trim_recording.get_sampling_frequency())/60))
-     
-            plot_noise_levels(trim_recording,self)
-            print(f"===== distributions of noise_levels plotted =====")
-            plot_preprocessing_steps(trim_recording,self)
+            prb = read_probeinterface(self.probe_path)
+            raw_recording = raw_recording._set_probes(prb)
+ 
+            plot_preprocessing_steps(raw_recording, self)
             print(f"===== traces for preprocessing_steps plotted =====")
+
+            mc_recording = run_preprocessing_without_motion_correction(raw_recording, self.protocol, self.preprocess_path)
+            save_processed_recording(mc_recording, self.preprocess_path / 'output')
             
-            if self.protocol.get('motion_correction'):
-                mc_recording = run_preprocessing_with_motion_correction(trim_recording, self.protocol, self.preprocess_path)
-                print(f"===== preprocessing with motion correction complete =====")
+            print(f"Estimating probe motion...........................")
+            detect_probe_motion(mc_recording, self.preprocess_path)
+            plot_probe_motion(self)
+            print(f"===== probe motion plotted =====")
                 
-                plot_probe_peaks(trim_recording,self)
-                print(f"===== activity peaks on probe plotted =====")
-                plot_motion_correction_traces(trim_recording,self)    
-                print(f"===== motion-corrected traces plotted =====")
-                
-            else:
-                mc_recording = run_preprocessing_without_motion_correction(trim_recording, self.protocol, self.preprocess_path)
-                
-            mc_recording = save_processed_recording(mc_recording, self.preprocess_path / 'output')
             save_params(self.preprocess_path / "params.json", self.motion_params)
             
-            print(f"✓ Preprocessed data saved: {self.preprocess_path}") 
+            print(f"✓ Preprocessed data saved: {self.preprocess_path}")
         else:
             print("Preprocessed data already exists, skipping save_preprocessed_recording")
 

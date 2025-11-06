@@ -53,9 +53,9 @@ class NeuropixelProfile(RecordingProfile):
             stream_names, stream_ids = get_neo_streams('spikeglx', self.data_path)
             raw_recording = read_spikeglx(self.data_path, stream_name=f'imec{self.probe_id}.ap', load_sync_channel=False)
             
-            plot_noise_levels(raw_recording,self)
+            #plot_noise_levels(raw_recording,self)
             print(f"===== distributions of noise_levels plotted =====")
-            plot_preprocessing_steps(raw_recording,self)
+            #plot_preprocessing_steps(raw_recording,self)
             print(f"===== traces for preprocessing_steps plotted =====")
 
             if self.protocol.get('motion_correction'):
@@ -69,9 +69,11 @@ class NeuropixelProfile(RecordingProfile):
             
                 save_processed_recording(mc_recording, self.preprocess_path / 'output')
             else:
-                mc_recording = run_preprocessing_without_motion_correction(raw_recording, self.protocol, self.preprocess_path)
-                save_processed_recording(mc_recording, self.preprocess_path / 'output')
-                
+                if (self.preprocess_path / 'output').exists():
+                    mc_recording = load(self.preprocess_path / 'output') 
+                else:
+                    mc_recording = run_preprocessing_without_motion_correction(raw_recording, self.protocol, self.preprocess_path)
+                                    
                 detect_probe_motion(mc_recording, self.preprocess_path)
                 plot_probe_motion(self)
                 print(f"===== probe motion plotted =====")

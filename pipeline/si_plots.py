@@ -24,34 +24,12 @@ def plot_probe_motion(profile):
     time_bins = time_bins - time_bins[0]       # start time (in sec) at 0
     motion = (motion - motion[0]).squeeze()    # initial motion at 0 µm
 
-    mean_motion = np.mean(motion, axis=1)
-    sem_motion = np.std(motion, axis=1) / np.sqrt(motion.shape[1]) # standard error of the mean
-
     fig, (ax1) = plt.subplots(1, 1, figsize=(15, 4))
 
-    ax1.fill_between(
-        time_bins,
-        mean_motion - sem_motion,
-        mean_motion + sem_motion,
-        color="gray",
-        alpha=0.3,
-        label=f"$\\pm$ SEM\n(n={mot.shape[1]} spatial bins)",
-        zorder=1,
-    )
-
-    # Mean line (on top)
-    ax1.plot(
-        time_bins,
-        mean_motion,
-        color="black",
-        linewidth=2,
-        label="mean",
-        zorder=2,
-    )
+    ax1.plot(time_bins, motion, color="black", linewidth=2)
 
     ax1.set_xlabel("Time [sec]")
     ax1.set_ylabel("Motion [$\\mu$m]")
-    ax1.set_ylim([-100, 100])
 
     fig.suptitle(f"{profile.session} --- {profile.metadata['probe_label'][profile.probe_id]}", fontsize=16, y=0.98)
     plt.tight_layout()

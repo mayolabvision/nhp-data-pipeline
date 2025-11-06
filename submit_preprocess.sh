@@ -34,23 +34,24 @@ echo "======================================================"
 
 #################################################################
 ################ Check that raw signal exists ###################
-#module load matlab/R2023a
-#NEV_PATH=$(python -c "import config; print(config.NEVUTIL_PATH)")
-#
-#RAW_DATA_PATH=$(python -c "import config; print(config.RAW_DATA_PATH)")
-#PROBES_PATH=$(python -c "import config; print(config.PROBES_PATH)")
-#DATA_PATH="${RAW_DATA_PATH}/${SESSION}"
-#
-#echo "Checking raw signal exists........................"
-#matlab -nodisplay <<EOF
-#addpath(genpath('matlab'));
-#addpath(genpath('${NEV_PATH}'));
-#fprintf('Running rawRipple_to_binaryFile for $1\n');
-#rawRipple_to_binaryFile('${DATA_PATH}', '${PROBES_PATH}');
-#exit
-#EOF
-#
-#echo "======================================================"
+
+module load matlab/R2023a
+NEV_PATH=$(python -c "import config; print(config.NEVUTIL_PATH)")
+RAW_DATA_PATH=$(python -c "import config; print(config.RAW_DATA_PATH)")
+PROBES_PATH=$(python -c "import config; print(config.PROBES_PATH)")
+DATA_PATH="${RAW_DATA_PATH}/${SESSION}"
+
+echo "Checking for raw signal in Ripple files..............."
+matlab -nodisplay <<EOF
+addpath(genpath('matlab'));
+addpath(genpath('${NEV_PATH}'));
+fprintf('Running rawRipple_to_binaryFile for ${SESSION}\n');
+rawRipple_to_binaryFile('${DATA_PATH}', '${PROBES_PATH}');
+exit
+EOF
+
+sleep 5
+echo "=================================================="
 
 #################################################################
 ##################### RUN SI (PP + Sort) ########################
