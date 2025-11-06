@@ -33,7 +33,8 @@ class PlexonProfile(RecordingProfile):
         self.data_path = Path(RAW_DATA_PATH) / self.session
         
         self.probe_path = self.data_path / f"{self.session}_prbMap.json"
-        self.num_channels = combine_probes(self.data_path, PROBES_PATH)
+        if not (self.probe_path).is_file():
+            combine_probes(self.data_path, PROBES_PATH)
  
         self.preprocess_hash = get_preprocess_hash(self.protocol["preprocessing"])    
         self.pp_hash, self.motion_hash, self.pp_params, self.motion_params = get_motion_hash(self.protocol['motion_correction'])
@@ -53,29 +54,49 @@ class PlexonProfile(RecordingProfile):
         save_params(self.figs_path / "params.json", self.protocol)
     
     def preprocessing(self):
-        if not (self.preprocess_path / 'params.json').is_file(): 
-            raw_recording = read_binary(file_paths=self.data_path / f"{self.session}.bin", num_channels=self.num_channels, 
-                                        sampling_frequency=30000, dtype="float64", time_axis=1)
-           
+        if not (self.preprocess_path / 'params.json').is_file():
+            print(f"--- Loading in raw data for applying preprocessing ---")
+
+            with open(self.data_path / "ripple_info.json", "r") as f:
+                ripple_info = json.load(f)
+ 
+            raw_recording = read_binary(file_paths = self.data_path / f"{self.session}.bin", 
+                                        sampling_frequency = ripple_info["Fs"],
+                                        num_channels = ripple_info["num_channels"],
+                                        dtype = ripple_info["dtype_python"],
+                                        gain_to_uV = ripple_info["gain_to_uV"],
+                                        offset_to_uV = ripple_info["offset_to_uV"]) 
+            print("--------------------------------------------------")
+            print("Sampling frequency:", raw_recording.get_sampling_frequency())
+            print("Number of channels:", raw_recording.get_num_channels())
+            print("Number of segments:", raw_recording.get_num_segments())
+            print("Number of samples:", raw_recording.get_num_samples(segment_index=0))
+            print("Duration of recording (min):", round((raw_recording.get_num_samples(segment_index=0)/raw_recording.get_sampling_frequency())/60))
+            print("Data dtype:", raw_recording.get_dtype())
+            print("--------------------------------------------------")
+ 
             prb = read_probeinterface(self.probe_path)
             raw_recording = raw_recording._set_probes(prb)
  
+            #plot_noise_levels(raw_recording,self)
+            #print(f"===== distributions of noise_levels plotted =====")
             plot_preprocessing_steps(raw_recording, self)
             print(f"===== traces for preprocessing_steps plotted =====")
 
+            print(f"--- Preprocessing data without motion correction ---")
             mc_recording = run_preprocessing_without_motion_correction(raw_recording, self.protocol, self.preprocess_path)
             save_processed_recording(mc_recording, self.preprocess_path / 'output')
+            print(f"✓ Preprocessed data saved: {self.preprocess_path}")
             
             print(f"Estimating probe motion...........................")
             detect_probe_motion(mc_recording, self.preprocess_path)
             plot_probe_motion(self)
-            print(f"===== probe motion plotted =====")
+            print(f"===== probe motion estimated and plotted =====")
                 
             save_params(self.preprocess_path / "params.json", self.motion_params)
-            
-            print(f"✓ Preprocessed data saved: {self.preprocess_path}")
+            print("Preprocessing of data compete!!!")
         else:
-            print("Preprocessed data already exists, skipping save_preprocessed_recording")
+            print("Preprocessed data already exists, skipping this step")
 
     def spike_sorting(self):
         if not (self.sorter_path / 'params.json').is_file():

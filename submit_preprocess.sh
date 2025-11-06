@@ -5,7 +5,7 @@
 #SBATCH --partition=high-mem
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
-#SBATCH --job-name=NHPipe-pp
+#SBATCH --job-name=preproc
 #SBATCH --error=/ix1/pmayo/outfiles/out_%A_%a.out
 #SBATCH --output=/ix1/pmayo/outfiles/out_%A_%a.out
 #SBATCH --mail-type=done,fail

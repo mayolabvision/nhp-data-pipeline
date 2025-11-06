@@ -144,4 +144,3 @@ def combine_probes(session_path,
     
     print(f"Saved probe JSON to {json_path}")
 
-    return contact_num
