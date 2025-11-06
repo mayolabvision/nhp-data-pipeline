@@ -43,6 +43,7 @@ function [nev,out_ns5,out_ns2] = extract_nevout(NEVPATH,varargin)
     addParameter(p, 'GAMMA', defaultGamma, @(x) isnumeric(x) && x>0 && x<1); % GAMMA must be numeric and between 0 and 1
     addParameter(p, 'netFolder', defaultNetFolder, @(x) ischar(x)); % GAMMA must be numeric and between 0 and 1
     addParameter(p, 'READ_LFP', false, @islogical); % CORRECT_ONLY must be logical
+    addParameter(p, 'KEEP_INT', false, @islogical);
     addParameter(p, 'alignPulseEnabled', false)
 
     % Parse the inputs
@@ -54,12 +55,13 @@ function [nev,out_ns5,out_ns2] = extract_nevout(NEVPATH,varargin)
     GAMMA = p.Results.GAMMA;
     netFolder = p.Results.netFolder;
     READ_LFP = p.Results.READ_LFP;
+    KEEP_INT = p.Results.KEEP_INT;
     ALIGN_PULSE = p.Results.alignPulseEnabled;
 
     [file_path,file_name,~] = fileparts(NEVPATH);
     NEVPATH = fullfile(file_path,file_name);
 
-    out_ns5 = read_nsx([NEVPATH '.ns5']);
+    out_ns5 = read_nsx([NEVPATH '.ns5'],'keepint', KEEP_INT);
     if READ_LFP
         out_ns2 = read_nsx([NEVPATH '.ns2']);
     else

@@ -38,9 +38,9 @@ if num_probes == 0
     return
 end
 
-if exist(fullfile(data_path,'ripple_info.json'), 'file') == 2
-    return
-end
+%if exist(fullfile(data_path,'ripple_info.json'), 'file') == 2
+%    return
+%end
 
 filePattern = fullfile(data_path, '*.ns5');
 raw_files = dir(filePattern);
@@ -84,7 +84,7 @@ for nevnum = 1:length(nevnames)
 
     if ~contains(this_task,'fstm')
         fprintf('\n---- loading raw signal for %s ----\n', this_task);
-        [~, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', false, 'READ_LFP', false);
+        [~, out_ns5, ~] = extract_nevout(nevpath, 'KEEP_INT', true);
 
         if ~isempty(out_ns5.data(ismember(out_ns5.hdr.label, string(1:512)),1))
             this_ns5 = [];
@@ -122,7 +122,7 @@ ns5_data = vertcat(ns5_tasks{:});
 % Saving data to binary file
 full_bin_path = fullfile(data_path,[metadata.sess_name,'.bin']); 
 fid_data = fopen(full_bin_path, 'wb'); % Open file in append mode ('a')
-fwrite(fid_data, ns5_data, 'double');
+fwrite(fid_data, ns5_data, 'int16');
 fclose(fid_data);
 
 % Storing important parameters to json
@@ -130,9 +130,9 @@ ripple_info = struct();
 ripple_info.Fs = double(out_ns5.hdr.Fs);
 ripple_info.num_samples = size(ns5_data,1);
 ripple_info.num_channels = size(ns5_data,2);
-ripple_info.dtype_matlab = 'double';
-ripple_info.dtype_python = 'float64';
-ripple_info.gain_to_uV = 1.0; % 
+ripple_info.dtype_matlab = 'int16';
+ripple_info.dtype_python = 'int16';
+ripple_info.gain_to_uV = out_ns5.hdr.scale(these_chans(1)); % e.g., 0.25 μV per int16 unit
 ripple_info.offset_to_uV = 0;
 
 json_text = jsonencode(ripple_info, 'PrettyPrint', true);
