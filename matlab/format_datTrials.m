@@ -1,4 +1,4 @@
-function [dat, epochEnd] = format_datTrials(nev, out_ns5, varargin)
+function [dat, epochEnd, tempdata] = format_datTrials(nev, out_ns5, varargin)
     % format_datTrials - Processes neural and behavioral data for multiple trials, 
     % extracts eye and spike data, and formats the information into a structured array.
     %
@@ -55,6 +55,7 @@ function [dat, epochEnd] = format_datTrials(nev, out_ns5, varargin)
     addParameter(p, 'EYE_CHAN_LABELS', defaultEyeChanLabels, (@(x) iscell(x))); % eye channel labels
     addParameter(p, 'DIODE_CHAN_LABEL', '10243', @ischar); % diode channel label
     addParameter(p, 'PUPIL_CHAN_LABEL', '10244', @ischar); % pupil channel label
+    addParameter(p, 'PREV_TEMPDATA', [], @isstruct);
 
     % Parse the inputs
     parse(p, nev, out_ns5, varargin{:});
@@ -66,6 +67,7 @@ function [dat, epochEnd] = format_datTrials(nev, out_ns5, varargin)
     eye_channel_labels = p.Results.EYE_CHAN_LABELS;
     pupil_channel_label = p.Results.PUPIL_CHAN_LABEL;
     diode_channel_label = p.Results.DIODE_CHAN_LABEL;
+    prev_tempdata = p.Results.PREV_TEMPDATA;
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -146,121 +148,130 @@ function [dat, epochEnd] = format_datTrials(nev, out_ns5, varargin)
         % Get session initial parameters
         predatcodes = digcodes(digcodes(:, 3) < trialstarts(1), :);
         tempdata.text = char(predatcodes(predatcodes(:, 2) >= 256 & predatcodes(:, 2) < 512, 2) - 256)';
-        if ~isempty(tempdata.text)
-    
+        if isempty(tempdata.text)
+            tempdata = prev_tempdata;
+        else
             tempdata = getDatParams(tempdata); % Get parameters associated with the data
-            if ~isempty(eye_channel_labels)
-                dat = repmat(struct(...
-                    'block', [], ...
-                    'channels', [], ...
-                    'time', [], ...
-                    'text', '', ...
-                    'trialcodes', [], ...
-                    'result', NaN, ...
-                    'params', struct(), ...
-                    'eyedata', [], ...
-                    'pupil', [], ...
-                    'diode', []), length(trialstarts), 1);
-               
-            else
-                dat = repmat(struct(...
+        end
+            
+        if ~isempty(eye_channel_labels)
+            dat = repmat(struct(...
                 'block', [], ...
                 'channels', [], ...
                 'time', [], ...
                 'text', '', ...
                 'trialcodes', [], ...
                 'result', NaN, ...
-                'params', struct()), length(trialstarts), 1);
+                'params', struct(), ...
+                'eyedata', [], ...
+                'pupil', [], ...
+                'diode', []), length(trialstarts), 1);
+           
+        else
+            dat = repmat(struct(...
+            'block', [], ...
+            'channels', [], ...
+            'time', [], ...
+            'text', '', ...
+            'trialcodes', [], ...
+            'result', NaN, ...
+            'params', struct()), length(trialstarts), 1);
+        end
+
+        %% Loop through trials and organize data
+        for n = 1:length(trialstarts)
+            if mod(n, 100) == 0
+                fprintf('Processed nev for %i trials of %i...\n', n, length(trialstarts));
+            end
+            dat(n).block = block;
+            dat(n).channels = channels;
+            dat(n).time = [trialstarts(n) trialends(n)]; % Store trial start and end times
+            this_trial = this_nev(trialstartinds(n):trialendinds(n), :);
+            trialdig = this_trial(this_trial(:, 1) == 0, :);
+            dat(n).text = char(trialdig(trialdig(:, 2) >= 256 & trialdig(:, 2) < 512, 2) - 256)';
+            dat(n).trialcodes = trialdig(trialdig(:, 2) < 256 | (trialdig(:, 2) >= 1000 & trialdig(:, 2) <= 32000), :);
+
+            % Extract trial result
+            event = uint32(trialdig);
+            dat(n).result = event(event(:, 2) >= 160 & event(:, 2) <= 165, 2);
+            if isempty(dat(n).result)
+                dat(n).result = event(event(:, 2) >= 150 & event(:, 2) <= 158, 2);
+            end
+            if isempty(dat(n).result)
+                dat(n).result = NaN;
             end
 
-            %% Loop through trials and organize data
-            for n = 1:length(trialstarts)
-                if mod(n, 100) == 0
-                    fprintf('Processed nev for %i trials of %i...\n', n, length(trialstarts));
+            % Extract block parameters
+            blockParams = tempdata.params.trial;
+            if isfield(blockParams, 'reactionTime')
+                blockParams.crossingTime = blockParams.reactionTime; % Copy reaction time to crossing time
+                blockParams = rmfield(blockParams, 'reactionTime'); % Remove old field
+            end
+                        
+            dat(n).params.block = blockParams;
+            
+            % Check if next trial is in a new block
+            if n < length(trialstarts) && trialstartinds(n+1) - trialendinds(n) > 1
+                bt = this_nev(trialendinds(n) + 1:trialstartinds(n + 1) - 1, :);
+                btdig = bt(bt(:, 1) == 0, :);
+                if sum(find(btdig(:, 2) >= 256 & btdig(:, 2) < 512)) > 0
+                    tempdata.text = char(btdig(btdig(:, 2) >= 256 & btdig(:, 2) < 512, 2) - 256)';
+                    tempdata = getDatParams(tempdata);
+                    block = block + 1; % Move to the next block
                 end
-                dat(n).block = block;
-                dat(n).channels = channels;
-                dat(n).time = [trialstarts(n) trialends(n)]; % Store trial start and end times
-                this_trial = this_nev(trialstartinds(n):trialendinds(n), :);
-                trialdig = this_trial(this_trial(:, 1) == 0, :);
-                dat(n).text = char(trialdig(trialdig(:, 2) >= 256 & trialdig(:, 2) < 512, 2) - 256)';
-                dat(n).trialcodes = trialdig(trialdig(:, 2) < 256 | (trialdig(:, 2) >= 1000 & trialdig(:, 2) <= 32000), :);
-    
-                % Extract trial result
-                event = uint32(trialdig);
-                dat(n).result = event(event(:, 2) >= 160 & event(:, 2) <= 165, 2);
-                if isempty(dat(n).result)
-                    dat(n).result = event(event(:, 2) >= 150 & event(:, 2) <= 158, 2);
-                end
-                if isempty(dat(n).result)
-                    dat(n).result = NaN;
-                end
-    
-                % Extract block parameters
-                blockParams = tempdata.params.trial;
-                if isfield(blockParams, 'reactionTime')
-                    blockParams.crossingTime = blockParams.reactionTime; % Copy reaction time to crossing time
-                    blockParams = rmfield(blockParams, 'reactionTime'); % Remove old field
-                end
-                                
-                dat(n).params.block = blockParams;
-                
-                % Check if next trial is in a new block
-                if n < length(trialstarts) && trialstartinds(n+1) - trialendinds(n) > 1
-                    bt = this_nev(trialendinds(n) + 1:trialstartinds(n + 1) - 1, :);
-                    btdig = bt(bt(:, 1) == 0, :);
-                    if sum(find(btdig(:, 2) >= 256 & btdig(:, 2) < 512)) > 0
-                        tempdata.text = char(btdig(btdig(:, 2) >= 256 & btdig(:, 2) < 512, 2) - 256)';
-                        tempdata = getDatParams(tempdata);
-                        block = block + 1; % Move to the next block
-                    end
+            end
+
+            dat(n).ns5_samps = ns5_rng([trialstarts_samp(n),trialends_samp(n)]);
+
+            % Extract and process eye data
+            if ~isempty(eye_channel_labels)
+                eyes = out_ns5.data(eye_channels, ns5_rng(trialstarts_samp(n):trialends_samp(n)));
+                eyes_1khz = downsample(eyes', 30)'; % Downsample to 1 kHz
+                [eyedeg, ~] = eye2deg(eyes_1khz(1:2, :), dat(n).params); % Convert to degrees
+                dat(n).eyedata = eyedeg;
+
+                if ~isempty(pupil_channel)
+                    pupil = out_ns5.data(pupil_channel, ns5_rng(trialstarts_samp(n):trialends_samp(n)));
+                    pupil_1khz = downsample(pupil', 30)'; % Downsample to 1 kHz
+                    dat(n).pupil = pupil_1khz;
                 end
 
-                dat(n).ns5_samps = ns5_rng([trialstarts_samp(n),trialends_samp(n)]);
-
-                % Extract and process eye data
-                if ~isempty(eye_channel_labels)
-                    eyes = out_ns5.data(eye_channels, ns5_rng(trialstarts_samp(n):trialends_samp(n)));
-                    eyes_1khz = downsample(eyes', 30)'; % Downsample to 1 kHz
-                    [eyedeg, ~] = eye2deg(eyes_1khz(1:2, :), dat(n).params); % Convert to degrees
-                    dat(n).eyedata = eyedeg;
-
-                    if ~isempty(pupil_channel)
-                        pupil = out_ns5.data(pupil_channel, ns5_rng(trialstarts_samp(n):trialends_samp(n)));
-                        pupil_1khz = downsample(pupil', 30)'; % Downsample to 1 kHz
-                        dat(n).pupil = pupil_1khz;
-                    end
-
-                    if ~isempty(diode_channel)
-                        diode = out_ns5.data(diode_channel, ns5_rng(trialstarts_samp(n):trialends_samp(n)));
-                        diode_1khz = downsample(diode', 30)'; % Downsample to 1 kHz
-                        dat(n).diode = diode_1khz;
-                    end
+                if ~isempty(diode_channel)
+                    diode = out_ns5.data(diode_channel, ns5_rng(trialstarts_samp(n):trialends_samp(n)));
+                    diode_1khz = downsample(diode', 30)'; % Downsample to 1 kHz
+                    dat(n).diode = diode_1khz;
                 end
-                
-                % Process neural spikes, if applicable
-                if ~isempty(neural_channels)
-                    spks = this_trial(ismember(this_trial(:, 1), neural_channels), :);
-                    spks_byChan = cell(1, size(neural_channels, 1));
-                    if spike_sort
-                        [netLabels_byChan, waveforms_byChan] = deal(cell(1, size(neural_channels, 1)));
-                    end
-                    for u = 1:length(spks_byChan)
-                        spks_byChan{u} = ((spks(ismember(spks(:, 1), neural_channels(u)), 3)') - trialstarts(n)) .* 1000;
+            end
+            
+            % Process neural spikes, if applicable
+            if ~isempty(neural_channels)
+                spks = this_trial(ismember(this_trial(:, 1), neural_channels), :);
+                sortcodes = unique(spks(:,2));
+                [spks_byChan, netLabels_byChan, waveforms_byChan] = deal(cell(1,size(neural_channels, 1)));
+
+                for c = 1:numel(neural_channels)
+                    [spks_byUnit, netLabels_byUnit, waveforms_byUnit] = deal(cell(1,numel(sortcodes)));
+                    for u = 1:numel(sortcodes)
+                        spks_byUnit{u} = ((spks(spks(:,1) == neural_channels(c) & spks(:,2) == sortcodes(u), 3)') - trialstarts(n)) .* 1000;
                         if spike_sort
-                            netLabels_byChan{u} = (spks(ismember(spks(:, 1), neural_channels(u)), 4)');
-                            waveforms_byChan{u} = (spks(ismember(spks(:, 1), neural_channels(u)), 5:end)');
+                            netLabels_byUnit{u} = (spks(spks(:,1) == neural_channels(c) & spks(:,2) == sortcodes(u), 4)');
+                            waveforms_byUnit{u} = (spks(spks(:,1) == neural_channels(c) & spks(:,2) == sortcodes(u), 5:end)');
                         end
                     end
-                    dat(n).spiketimes = spks_byChan; % Store spike times
+                    spks_byChan{c} = spks_byUnit;
                     if spike_sort
-                        dat(n).net_labels = netLabels_byChan; % Store spike sorting labels
+                        netLabels_byChan{c} = netLabels_byUnit;
+                        waveforms_byChan{c} = waveforms_byUnit;
                     end
                 end
-    
+                dat(n).spiketimes = spks_byChan; % Store spike times
+                if spike_sort
+                    dat(n).net_labels = netLabels_byChan; % Store spike sorting labels
+                end
             end
-            dat = getDatParams(dat); % Final parameter extraction
+    
         end
+        dat = getDatParams(dat); % Final parameter extraction
     
         % Concatenate the new structured data to the main array
         dat_all = [dat_all; dat];

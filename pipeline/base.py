@@ -16,7 +16,6 @@ class RecordingProfile(ABC):
         self.data_path = None
         self.metadata = None
         self.probe_path = None
-        self.cutoff_frame = None
         self.preprocess_hash = None
         self.preprocess_path = None
         self.motion_hash = None
@@ -45,11 +44,6 @@ class RecordingProfile(ABC):
     def prep_session_data(self):
         """Check and prepare raw data for processing."""
         return self
-
-    @abstractmethod
-    def motion_screening(self):
-        """Applying motion screening to raw recording."""
-        pass
 
     @abstractmethod
     def preprocessing(self):

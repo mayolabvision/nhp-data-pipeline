@@ -29,6 +29,10 @@ function process_fullRecording(session_name,varargin)
 
     addpath(genpath(NEV_PATH));
 
+    if isequal(SORTER_PATH, 'None')
+        SORTER_PATH = [];
+    end
+
     % Get the directory of the current script or function
     currentDir = fileparts(mfilename('fullpath'));
     parentDirOneLevelUp = fileparts(currentDir);
@@ -47,8 +51,16 @@ function process_fullRecording(session_name,varargin)
         metadata = loadMetadataJSON(fullfile(session_path,'metadata.json'));
         Tmeta = struct2table(rmfield(metadata, {'sess_name', 'HEeye_VEeye_diode_pupil'}));
 
+        eye_chan_labels = metadata.HEeye_VEeye_diode_pupil(1:2)';
+        diode_chan_label = metadata.HEeye_VEeye_diode_pupil{3};
+        pupil_chan_label = metadata.HEeye_VEeye_diode_pupil{4};
+
         S1.sess_name = metadata.sess_name;
     else
+        eye_chan_labels = {'10241','10242'};
+        diode_chan_label = '10243';
+        pupil_chan_label = '10244';
+
         S1.sess_name = session_name;
     end
 
@@ -64,7 +76,7 @@ function process_fullRecording(session_name,varargin)
     nevpaths = raw_filepaths(idx);
 
     % Define possible task keywords
-    task_keywords = {'rfmp', 'rfMapping', 'purs', 'pursuit', 'mdir', 'dirmem', 'fstm', 'cfix'};
+    task_keywords = {'rfmp', 'rfMapping', 'purs', 'pursuit', 'mdir', 'dirmem', 'fstm', 'cfix', 'frvw', 'oflu'};
     
     % Initialize cell array for tasks
     tasks = cell(size(nevnames));
@@ -90,7 +102,7 @@ function process_fullRecording(session_name,varargin)
     taskTypes = unique(cellfun(@(q) regexp(q, '[a-zA-Z]+', 'match', 'once'), tasks, 'uni', 0));
     disp(tasks)
 
-    if ismember('neuropixel',metadata.probe_type)
+    if ismember('neuropixel', metadata.probe_type)
         imec_dirs = dir(fullfile(RAW_PATH, session_name,[session_name, '*_imec*']));
         imec_dirs = arrayfun(@(q) fullfile(q.folder, q.name), imec_dirs, 'uni', 0);
         imec_nums = cellfun(@(q) str2num(q(end)), imec_dirs, 'uni', 0);
@@ -120,6 +132,7 @@ function process_fullRecording(session_name,varargin)
     tic
 
     goodFlag = true;
+    prev_tempdata = struct([]);
     for nevnum = 1:length(nevnames) % loop through nev files, in chronological
         nevpath = nevpaths{nevnum};
         this_task = tasks{nevnum};
@@ -131,7 +144,7 @@ function process_fullRecording(session_name,varargin)
             [nev, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', false, 'READ_LFP', false, 'alignPulseEnabled', true);
             startAcquisition = datetime(out_ns5.hdr.timeOrigin, 'InputFormat', 'dd-MMM-yyyy HH:mm:ss.SSS');
 
-            [dat, ~] = format_datTrials(nev, out_ns5);
+            [dat, ~] = format_datTrials(nev, out_ns5, 'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
 
             firstSyncPulse = startAcquisition + seconds(dat(1).trialcodes(2,3));
             ripple_pulse_timeStamps = cellfun(@(w) (firstSyncPulse + seconds(w)) - seconds(dat(1).trialcodes(2,3)), cellfun(@(q) q(2,3), {dat.trialcodes}.', 'uni', 0), 'uni', 1);     
@@ -176,11 +189,11 @@ function process_fullRecording(session_name,varargin)
                 [nev, out_ns5, out_ns2] = extract_nevout(nevpath, 'SPIKE_SORT', true, 'netFolder', fullfile(NET_PATH,'networks'), 'READ_LFP', true);
                 lfp = extract_lfpData(nev,out_ns2,mappings.ripChan_num); 
     
-                [dat, ~] = format_datTrials(nev, out_ns5, 'NEURAL_CHANNELS', mappings.ripChan_num);
+                [dat, ~] = format_datTrials(nev, out_ns5, 'NEURAL_CHANNELS', mappings.ripChan_num, 'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
                 tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task, 'LFP', lfp);
             else
                 [nev, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', true, 'netFolder', fullfile(NET_PATH,'networks'), 'READ_LFP', false);
-                [dat, ~] = format_datTrials(nev, out_ns5, 'NEURAL_CHANNELS', mappings.ripChan_num);
+                [dat, ~] = format_datTrials(nev, out_ns5, 'NEURAL_CHANNELS', mappings.ripChan_num, 'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
                 tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task);
             end
 
@@ -189,14 +202,42 @@ function process_fullRecording(session_name,varargin)
             addpath(genpath(NET_PATH));
 
             [nev, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', true, 'netFolder', fullfile(NET_PATH,'networks'));
-            [dat, ~] = format_datTrials(nev, out_ns5, 'NEURAL_CHANNELS', 1);
-            tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task);
+
+            hw_config = metadata.hardware_config{1};
+            parts = strsplit(hw_config, '_');
+            this_hw = parts{1};
+            this_chan = str2double(parts{2});
+
+            if isequal(this_hw,"elecA")
+                neural_chans = this_chan;
+            elseif isequal(this_hw,"elecB")
+                neural_chans = this_chan+128;
+            elseif isequal(this_hw,"elecC")
+                neural_chans = this_chan+256;
+            elseif isequal(this_hw,"elecD")
+                neural_chans = this_chan+384;
+            end
+
+
+            [dat, ~, tempdata] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ...
+                'NEURAL_CHANNELS', neural_chans, 'EYE_CHAN_LABELS', eye_chan_labels, ...
+                'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
+            
+            if ~isempty(dat)
+                prev_tempdata = tempdata;
+                tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task);
+            else
+                tbl = [];
+            end
+
+            [~, fname, ~] = fileparts(nevpath);   % 'kendra_scrappy_0066a_mdir1'
+            this_task = erase(fname, session_name); % 'a_mdir1'
 
         %----- BEHAVIOR ONLY -----%
         else 
             [nev, out_ns5, ~] = extract_nevout(nevpath);
             if ~isempty(nev)
-                [dat, ~] = format_datTrials(nev, out_ns5);
+                [dat, ~] = format_datTrials(nev, out_ns5, 'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
                 tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task);
             else
                 dat = []; tbl = [];
@@ -280,21 +321,23 @@ function process_fullRecording(session_name,varargin)
         end
 
         % Remove trials with absolutely no spikes in them
-        colnames = tbl.Properties.VariableNames(contains(tbl.Properties.VariableNames, 'spiketimes'));
-        if ~isempty(colnames)
-            % logical mask: true if ANY of the spiketimes columns is empty for that row
-            emptyMask = false(height(tbl),1);
-            for c = 1:numel(colnames)
-                emptyMask = emptyMask | cellfun(@(q) isempty(q) || all(cellfun(@isempty, q)), tbl.(colnames{c}));
+        if ~isempty(tbl)
+            colnames = tbl.Properties.VariableNames(contains(tbl.Properties.VariableNames, 'spiketimes'));
+            if ~isempty(colnames)
+                % logical mask: true if ANY of the spiketimes columns is empty for that row
+                emptyMask = false(height(tbl),1);
+                for c = 1:numel(colnames)
+                    emptyMask = emptyMask | cellfun(@(q) isempty(q) || all(cellfun(@isempty, q)), tbl.(colnames{c}));
+                end
+                
+                % remove rows where any col is empty
+                tbl(emptyMask,:) = [];
             end
-            
-            % remove rows where any col is empty
-            tbl(emptyMask,:) = [];
+    
+            tbl.sess_name = repmat({session_name}, height(tbl), 1);
+            tbl = movevars(tbl,{'sess_name'},'Before','trialName');
+            tbl.sess_name = categorical(tbl.sess_name);
         end
-
-        tbl.sess_name = repmat({session_name}, height(tbl), 1);
-        tbl = movevars(tbl,{'sess_name'},'Before','trialName');
-        tbl.sess_name = categorical(tbl.sess_name);
 
         S1.(this_task).dat = dat;
         S1.(this_task).tbl = tbl;

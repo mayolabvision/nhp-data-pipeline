@@ -4,7 +4,7 @@
 #SBATCH --cluster=smp
 #SBATCH --partition=high-mem
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=32
+#SBATCH --cpus-per-task=16
 #SBATCH --job-name=postproc
 #SBATCH --error=/ix1/pmayo/outfiles/out_%A_%a.out
 #SBATCH --output=/ix1/pmayo/outfiles/out_%A_%a.out
@@ -23,7 +23,7 @@ source activate "$ENV_PATH"
 echo "======================================================"
 
 SESSION="${1}"
-PROTOCOL="${2:-np-nodrift-ks4_wr12}"
+PROTOCOL="${2:-np-ks4}"
 
 PROBE_ID=$SLURM_ARRAY_TASK_ID
 

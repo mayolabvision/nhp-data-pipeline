@@ -1,5 +1,7 @@
 # main_pipeline.py
 from pathlib import Path
+import os
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
 from pipeline import get_recording_profile, save_protocol_to_dict
 from config import PROTOCOLS_PATH
@@ -20,13 +22,6 @@ def run_preprocess(session, probe_id=0, protocol=None):
     print(f"preprocess_hash  =  {profile.preprocess_hash}")
     print(f"motion_hash      =  {profile.motion_hash}")
     
-    profile.make_probe_map()
-    print(f"-------------- ✓ Probe map generated --------------")
-    
-    profile.motion_screening()
-    print(f"cutoff_frame      =  {profile.cutoff_frame}")
-    print(f"----------- ✓ Motion screening complete -----------")
-
     profile.preprocessing()
     print(f"------------ ✓ Preprocessing complete -------------")
     
@@ -73,6 +68,9 @@ def profile_to_mat(session, protocol=None):
     profile.prep_session_data()
 
     # Get only the part after "sorting"
-    sorter_path = str(profile.sorter_path).split("sorting", 1)[1].lstrip("/\\")
+    if profile.sorter_path is not None:
+        sorter_path = str(profile.sorter_path).split("sorting", 1)[1].lstrip("/\\")
+    else:
+        sorter_path = None
 
     return sorter_path

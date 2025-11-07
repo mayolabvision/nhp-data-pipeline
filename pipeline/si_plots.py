@@ -17,39 +17,26 @@ from medicine.plotting import plot_motion_correction
 global_job_kwargs = dict(n_jobs=int(int(os.environ.get("SLURM_CPUS_PER_TASK", "8"))-1), chunk_duration='1s', progress_bar=True)
 set_global_job_kwargs(**global_job_kwargs)
 
-def plot_motion_screening(profile, cutoff_time_sec):
-    motion = np.load(profile.preprocess_path.parent.parent / 'rigid_fast_motion.npy')
-    time_bins = np.load(profile.preprocess_path.parent.parent / 'rigid_fast_time_bins.npy')
+def plot_probe_motion(profile):
+    motion = np.load(profile.preprocess_path / 'medicine_motion.npy')
+    time_bins = np.load(profile.preprocess_path / 'medicine_time_bins.npy')
     
-    time_bins = time_bins[0] - time_bins[0][0]       # start time (in sec) at 0
-    motion = (motion[0] - motion[0][0]).squeeze()    # initial motion at 0 µm
-
-    motion_smooth = savgol_filter(motion, window_length=11, polyorder=3)  
-    
-    threshold = profile.protocol['motion_screening']['motion_thresh_um']
+    time_bins = time_bins - time_bins[0]       # start time (in sec) at 0
+    motion = (motion - motion[0]).squeeze()    # initial motion at 0 µm
 
     fig, (ax1) = plt.subplots(1, 1, figsize=(15, 4))
 
-    ax1.plot(time_bins, motion, alpha=0.75, linewidth=2, color="gray", label="motion")
-    ax1.plot(time_bins, motion_smooth, alpha=0.9, color="black", label="smoothed motion")
+    ax1.plot(time_bins, motion, color="black", linewidth=2)
+
     ax1.set_xlabel("Time [sec]")
-    ax1.set_xlim([0, time_bins.max()])
     ax1.set_ylabel("Motion [$\\mu$m]")
-    ax1.set_ylim([-100, 100])
 
-    ax1.axhline(-threshold, color="black", linestyle=":", alpha=0.2)
-    ax1.axhline(threshold, color="black", linestyle=":", alpha=0.2, label=f"threshold = |motion| > {threshold}um")
-
-    if cutoff_time_sec is not None:
-        ax1.axvline(cutoff_time_sec, color="red", linestyle="-", label=f"excessive motion onset @ {cutoff_time_sec:.1f}s")
-
-    ax1.legend(loc="upper left")
     fig.suptitle(f"{profile.session} --- {profile.metadata['probe_label'][profile.probe_id]}", fontsize=16, y=0.98)
     plt.tight_layout()
     fig.text(0.5, 0.88, f"{profile.metadata['hardware_config'][profile.probe_id]}, {profile.metadata['probe_config'][profile.probe_id]}: depth = {profile.metadata['probe_depth_mm'][profile.probe_id]}mm, grid hole = {profile.metadata['probe_gridHole'][profile.probe_id]}", ha='center', fontsize=12)
     
     plt.tight_layout(rect=[0.05, 0.05, 1, 0.97])  # leave space for labels
-    fig.savefig(Path(profile.figs_path) / "motion_screening.png", dpi=300, bbox_inches="tight")
+    fig.savefig(Path(profile.figs_path) / "probe_motion.png", dpi=300, bbox_inches="tight")
 
 def plot_preprocessing_steps(raw_recording, profile):
     # collect preprocessing steps

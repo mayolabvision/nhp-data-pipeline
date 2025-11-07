@@ -23,7 +23,7 @@ source activate "$ENV_PATH"
 echo "======================================================"
 
 SESSION="${1}"
-PROTOCOL="${2:-np-nodrift-ks4_wr12}"
+PROTOCOL="${2:-np-ks4}"
 
 echo "SESSION    =  '$SESSION'"
 echo "PROTOCOL   =  $PROTOCOL"
@@ -52,37 +52,39 @@ echo "======================================================"
 RAW_PATH=$(python -c "import config; print(config.RAW_DATA_PATH)")
 OUT_PATH=$(python -c "import config; print(config.RAW_DATA_PATH)")
 NEV_PATH=$(python -c "import config; print(config.NEVUTIL_PATH)")
+NET_PATH=$(python -c "import config; print(config.NASNET_PATH)")
 
-#echo "Running matlab pipeline........................"
-#matlab -nodisplay <<EOF
-#addpath(genpath('matlab'));   % add the subdirectory to path
-#fprintf('Running process_fullRecording for $1\n');
-#process_fullRecording('${SESSION}', ...
-#    'RAW_DATA_PATH', '$RAW_PATH', ...
-#    'OUT_DATA_PATH', '$OUT_PATH', ...
-#    'NEVUTIL_PATH', '$NEV_PATH', ...
-#    'SORTER_PATH', '$SORTER_PATH');
-#exit
-#EOF
-
-#################################################################
-HELPERS_PATH=$(python -c "import config; print(config.HELPERS_PATH)")
-
-TBL_PATH="${OUT_DATA_PATH}/${SESSION}/tables/${SESSION}-${SORTER_PATH}.mat"
-echo "TBL_PATH    =  '$TBL_PATH'"
-echo "======================================================"
-
-echo "Running extra matlab fxns........................"
+echo "Running matlab pipeline........................"
 matlab -nodisplay <<EOF
-addpath(genpath('matlab'));
-addpath(genpath('${HELPERS_PATH}/behavior'));
-addpath(genpath('${HELPERS_PATH}/utils'));
-addpath(genpath('${HELPERS_PATH}/neurons'));
-fprintf('Running addToTbl_KKN for $1\n');
-addToTbl_KKN('${TBL_PATH}', ...
-    'SAVE_NAME', '${PROTOCOL}');
+addpath(genpath('matlab'));   % add the subdirectory to path
+fprintf('Running process_fullRecording for $1\n');
+process_fullRecording('${SESSION}', ...
+    'RAW_DATA_PATH', '$RAW_PATH', ...
+    'OUT_DATA_PATH', '$OUT_PATH', ...
+    'NEVUTIL_PATH', '$NEV_PATH', ... 
+    'NASNET_PATH', '$NET_PATH',...
+    'SORTER_PATH', '$SORTER_PATH');
 exit
 EOF
+
+#################################################################
+#HELPERS_PATH=$(python -c "import config; print(config.HELPERS_PATH)")
+#
+#TBL_PATH="${OUT_DATA_PATH}/${SESSION}/tables/${SESSION}-${SORTER_PATH}.mat"
+#echo "TBL_PATH    =  '$TBL_PATH'"
+#echo "======================================================"
+#
+#echo "Running extra matlab fxns........................"
+#matlab -nodisplay <<EOF
+#addpath(genpath('matlab'));
+#addpath(genpath('${HELPERS_PATH}/behavior'));
+#addpath(genpath('${HELPERS_PATH}/utils'));
+#addpath(genpath('${HELPERS_PATH}/neurons'));
+#fprintf('Running addToTbl_KKN for $1\n');
+#addToTbl_KKN('${TBL_PATH}', ...
+#    'SAVE_NAME', '${PROTOCOL}');
+#exit
+#EOF
 
 #################################################################
 echo "DONE"

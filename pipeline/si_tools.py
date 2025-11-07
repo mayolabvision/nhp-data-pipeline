@@ -1,5 +1,7 @@
 # si_utils.py
 import os
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -7,7 +9,7 @@ from scipy.signal import savgol_filter
 
 from spikeinterface.core import set_global_job_kwargs, BaseRecording
 from spikeinterface.extractors import get_neo_streams, read_spikeglx
-from spikeinterface.preprocessing import apply_preprocessing_pipeline, compute_motion
+from spikeinterface.preprocessing import apply_preprocessing_pipeline, bandpass_filter, compute_motion
 from spikeinterface.core.motion import Motion
 from spikeinterface.sortingcomponents.peak_detection import detect_peaks
 from spikeinterface.sortingcomponents.peak_localization import localize_peaks
@@ -34,56 +36,20 @@ def load_or_compute_peaks(preprocess_path, recording, protocol):
 
     return peaks, peak_locations
 
-def detect_excessive_motion(raw_recording, preprocess_path, threshold_um=1000, min_duration_sec=30):
+def detect_probe_motion(recording, save_path):
+    depths = recording.get_channel_locations()
+    max_depth = int(depths.max(axis=0)[1])
     
-    if not (preprocess_path.parent.parent / 'rigid_fast_motion.npy').is_file():
-        preprocessing_dict = {
-        'bandpass_filter': {'freq_min': 300, 'freq_max': 5000, 'dtype': 'int16'},
-        'phase_shift': {},
-        'common_reference': {'operator': 'median', 'reference': 'global'}
-        }
+    filt_recording = bandpass_filter(recording=recording, freq_min=300., freq_max=5000.)
+    motion = compute_motion(filt_recording, preset="medicine", 
+                        detect_kwargs={'method':'locally_exclusive'}, 
+                        localize_peaks_kwargs={'method': 'monopolar_triangulation'},
+                        estimate_motion_kwargs={'win_scale_um': max_depth, 'motion_bound':800, 'time_kernel_width': 60})
 
-        pp_recording = apply_preprocessing_pipeline(raw_recording, preprocessing_dict)
-       
-        motion = compute_motion(pp_recording, preset="rigid_fast") 
-        
-        np.save(preprocess_path.parent.parent / 'rigid_fast_motion.npy', motion.displacement)
-        np.save(preprocess_path.parent.parent / 'rigid_fast_time_bins.npy', motion.temporal_bins_s)
-        np.save(preprocess_path.parent.parent / 'rigid_fast_depth_bins.npy', motion.spatial_bins_um)
+    np.save(save_path / 'medicine_motion.npy', motion.displacement[0])
+    np.save(save_path / 'medicine_time_bins.npy', motion.temporal_bins_s[0])
+    np.save(save_path / 'medicine_depth_bins.npy', motion.spatial_bins_um)
     
-    motion = np.load(preprocess_path.parent.parent / 'rigid_fast_motion.npy')
-    time_bins = np.load(preprocess_path.parent.parent / 'rigid_fast_time_bins.npy')
-    depth_bins = np.load(preprocess_path.parent.parent / 'rigid_fast_depth_bins.npy') 
-    
-    time_bins = time_bins[0] - time_bins[0][0]       # start time (in sec) at 0
-    motion = (motion[0] - motion[0][0]).squeeze()    # initial motion at 0 µm
-
-    motion_smooth = savgol_filter(motion, window_length=11, polyorder=3)
-
-    # --- calculate onset time ---
-    onset_time_sec = None
-    onset_time_frame = None
-
-    # mask: don't worry about initial noise issues
-    mask = time_bins >= 1200
-
-    above_thresh = (np.abs(motion_smooth) > threshold_um) & mask
-
-    if np.any(above_thresh):
-        idx = np.where(above_thresh)[0]
-
-        # Find breaks between contiguous stretches
-        breaks = np.where(np.diff(idx) > 1)[0] + 1
-        segments = np.split(idx, breaks)
-
-        for segment in segments:
-            duration = time_bins[segment[-1]] - time_bins[segment[0]]
-            if duration >= min_duration_sec:
-                onset_time_sec = time_bins[segment[0]]
-                break
-
-    return onset_time_sec 
-
 def run_preprocessing_with_motion_correction(raw_recording, protocol, preprocess_path):
     os.makedirs(preprocess_path, exist_ok=True)
     

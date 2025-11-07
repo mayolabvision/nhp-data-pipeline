@@ -1,6 +1,31 @@
 function rawRipple_to_binaryFile(data_path,probes_path)
-%UNTITLED Summary of this function goes here
-%   Detailed explanation goes here
+% Convert Ripple NS5 raw signals to a single binary file, for spike sorting
+%
+% This function reads raw neural signals from Ripple NS5 files in a session,
+% selects channels corresponding to Plexon probes, concatenates them across 
+% multiple tasks, and saves the combined data as a binary file (.bin) in 
+% channels x samples format.
+%
+% Additionally, it creates a JSON file ('ripple_info.json') storing essential
+% metadata such as:
+%   - Sampling frequency (Fs)
+%   - Number of channels and samples
+%   - Data type information (MATLAB and Python)
+%   - Gain and offset to convert to microvolts (uV)
+%
+% INPUTS:
+%   data_path   : Path to the session folder containing NS5 files and metadata.json
+%   probes_path : Path to folder containing Plexon probe configurations (*.mat)
+%
+% OUTPUT:
+%   Creates a binary file [sess_name].bin in data_path containing the concatenated
+%   raw signals (samples x channels) and a ripple_info.json file with metadata.
+%
+% NOTES:
+%   - Only Plexon probes are processed.
+%   - Tasks with 'fstm' in the name are skipped (microstim data)
+%   - Raw NS5 data is assumed to already be in physical units (µV), so gain_to_uV = 1.
+%   - If the output files already exist, the function returns without overwriting.
 
 json_text = fileread(fullfile(data_path,'metadata.json'));
 metadata = jsondecode(json_text);
@@ -13,10 +38,9 @@ if num_probes == 0
     return
 end
 
-full_bin_path = fullfile(data_path,[metadata.sess_name,'.bin']); 
-if exist(full_bin_path, 'file') == 2
-    return
-end
+%if exist(fullfile(data_path,'ripple_info.json'), 'file') == 2
+%    return
+%end
 
 filePattern = fullfile(data_path, '*.ns5');
 raw_files = dir(filePattern);
@@ -53,13 +77,14 @@ for i = 1:numel(nevnames)
     end
 end
 
+ns5_tasks = cell(length(nevnames),1);
 for nevnum = 1:length(nevnames)
     nevpath = nevpaths{nevnum};
     this_task = tasks{nevnum};
 
     if ~contains(this_task,'fstm')
         fprintf('\n---- loading raw signal for %s ----\n', this_task);
-        [~, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', false, 'READ_LFP', false);
+        [~, out_ns5, ~] = extract_nevout(nevpath, 'KEEP_INT', true);
 
         if ~isempty(out_ns5.data(ismember(out_ns5.hdr.label, string(1:512)),1))
             this_ns5 = [];
@@ -81,17 +106,38 @@ for nevnum = 1:length(nevnames)
                 this_ns5 = [this_ns5; out_ns5.data(ismember(out_ns5.hdr.label, string(these_chans)),:)];
             end
 
-            fid_write = fopen(full_bin_path, 'a'); % Open file in append mode ('a')
-            fwrite(fid_write, this_ns5, 'double');
-
-            fclose(fid_write);  
+            % Save each task as samples x channels 
+            ns5_tasks{nevnum} = this_ns5';
         else
             fprintf('\n---- no raw signal for %s ----\n', this_task);
-            delete(full_bin_path);
             return
         end
 
     end
 end
+
+% Samples x Channels (across all tasks)
+ns5_data = vertcat(ns5_tasks{:});
+
+% Saving data to binary file
+full_bin_path = fullfile(data_path,[metadata.sess_name,'.bin']); 
+fid_data = fopen(full_bin_path, 'wb'); % Open file in append mode ('a')
+fwrite(fid_data, ns5_data, 'int16');
+fclose(fid_data);
+
+% Storing important parameters to json
+ripple_info = struct();
+ripple_info.Fs = double(out_ns5.hdr.Fs);
+ripple_info.num_samples = size(ns5_data,1);
+ripple_info.num_channels = size(ns5_data,2);
+ripple_info.dtype_matlab = 'int16';
+ripple_info.dtype_python = 'int16';
+ripple_info.gain_to_uV = out_ns5.hdr.scale(these_chans(1)); % e.g., 0.25 μV per int16 unit
+ripple_info.offset_to_uV = 0;
+
+json_text = jsonencode(ripple_info, 'PrettyPrint', true);
+fid_info = fopen(fullfile(data_path, 'ripple_info.json'), 'w');
+fwrite(fid_info, json_text, 'char');
+fclose(fid_info);
 
 end
