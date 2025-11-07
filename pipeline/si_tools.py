@@ -9,7 +9,7 @@ from scipy.signal import savgol_filter
 
 from spikeinterface.core import set_global_job_kwargs, BaseRecording
 from spikeinterface.extractors import get_neo_streams, read_spikeglx
-from spikeinterface.preprocessing import apply_preprocessing_pipeline, compute_motion
+from spikeinterface.preprocessing import apply_preprocessing_pipeline, bandpass_filter, compute_motion
 from spikeinterface.core.motion import Motion
 from spikeinterface.sortingcomponents.peak_detection import detect_peaks
 from spikeinterface.sortingcomponents.peak_localization import localize_peaks
@@ -39,7 +39,9 @@ def load_or_compute_peaks(preprocess_path, recording, protocol):
 def detect_probe_motion(recording, save_path):
     depths = recording.get_channel_locations()
     max_depth = int(depths.max(axis=0)[1])
-    motion = compute_motion(recording, preset="medicine", 
+    
+    filt_recording = bandpass_filter(recording=recording, freq_min=300., freq_max=5000.)
+    motion = compute_motion(filt_recording, preset="medicine", 
                         detect_kwargs={'method':'locally_exclusive'}, 
                         localize_peaks_kwargs={'method': 'monopolar_triangulation'},
                         estimate_motion_kwargs={'win_scale_um': max_depth, 'motion_bound':800, 'time_kernel_width': 60})

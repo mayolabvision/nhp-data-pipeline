@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 from datetime import date
+from .behavior import BehaviorProfile
+from .fhc import FHCProfile
 from .neuropixel import NeuropixelProfile
 from .plexon import PlexonProfile
 from config import RAW_DATA_PATH, PROTOCOLS_PATH
@@ -8,7 +10,9 @@ from config import RAW_DATA_PATH, PROTOCOLS_PATH
 # Mapping from probe_type to class
 RECORDING_PROFILE_MAP = {
     "neuropixel": NeuropixelProfile,
-    "plexon": PlexonProfile
+    "plexon": PlexonProfile,
+    "fhc": FHCProfile,
+    "behavior": BehaviorProfile
 }
 
 def get_recording_profile(session, probe_id):
@@ -20,7 +24,10 @@ def get_recording_profile(session, probe_id):
     with open(metadata_path, "r") as f:
         metadata = json.load(f)
 
-    probe_type = metadata["probe_type"][probe_id]
+    if not metadata.get("probe_type"):   # empty list, None, or missing key
+        probe_type = "behavior"
+    else:
+        probe_type = metadata["probe_type"][probe_id]
 
     try:
         return RECORDING_PROFILE_MAP[probe_type.lower()]

@@ -1,10 +1,10 @@
 #!/bin/bash -l
 #SBATCH --nodes=1
-#SBATCH --time=0-16:00:00
+#SBATCH --time=0-23:59:59
 #SBATCH --cluster=smp
 #SBATCH --partition=high-mem
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=32
+#SBATCH --cpus-per-task=48
 #SBATCH --job-name=preproc
 #SBATCH --error=/ix1/pmayo/outfiles/out_%A_%a.out
 #SBATCH --output=/ix1/pmayo/outfiles/out_%A_%a.out
