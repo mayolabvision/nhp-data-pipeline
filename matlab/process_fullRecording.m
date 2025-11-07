@@ -29,6 +29,10 @@ function process_fullRecording(session_name,varargin)
 
     addpath(genpath(NEV_PATH));
 
+    if isequal(SORTER_PATH, 'None')
+        SORTER_PATH = [];
+    end
+
     % Get the directory of the current script or function
     currentDir = fileparts(mfilename('fullpath'));
     parentDirOneLevelUp = fileparts(currentDir);
