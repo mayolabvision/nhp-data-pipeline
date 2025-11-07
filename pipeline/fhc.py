@@ -19,6 +19,7 @@ class FHCProfile(RecordingProfile):
         
         self.tbl_path = self.data_path / "tables" / f"{self.session}.mat"
         self.figs_path = self.data_path / "figs" / f"{self.metadata['hardware_config'][self.probe_id]}_{self.metadata['probe_label'][self.probe_id]}"
+        save_params(self.figs_path / "params.json", self.protocol)
     
     def preprocessing(self):
         pass
