@@ -23,7 +23,7 @@ source activate "$ENV_PATH"
 echo "======================================================"
 
 SESSION="${1}"
-PROTOCOL="${2:-np-nodrift-ks4_wr12}"
+PROTOCOL="${2:-np-ks4}"
 
 echo "SESSION    =  '$SESSION'"
 echo "PROTOCOL   =  $PROTOCOL"
@@ -52,6 +52,7 @@ echo "======================================================"
 RAW_PATH=$(python -c "import config; print(config.RAW_DATA_PATH)")
 OUT_PATH=$(python -c "import config; print(config.RAW_DATA_PATH)")
 NEV_PATH=$(python -c "import config; print(config.NEVUTIL_PATH)")
+NET_PATH=$(python -c "import config; print(config.NASNET_PATH)")
 
 echo "Running matlab pipeline........................"
 matlab -nodisplay <<EOF
@@ -60,7 +61,8 @@ fprintf('Running process_fullRecording for $1\n');
 process_fullRecording('${SESSION}', ...
     'RAW_DATA_PATH', '$RAW_PATH', ...
     'OUT_DATA_PATH', '$OUT_PATH', ...
-    'NEVUTIL_PATH', '$NEV_PATH', ...
+    'NEVUTIL_PATH', '$NEV_PATH', 
+    'NASNET_PATH', '$NET_PATH',...
     'SORTER_PATH', '$SORTER_PATH');
 exit
 EOF

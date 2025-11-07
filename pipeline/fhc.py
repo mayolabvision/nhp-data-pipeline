@@ -17,7 +17,7 @@ class FHCProfile(RecordingProfile):
     def prep_session_data(self):
         self.data_path = Path(RAW_DATA_PATH) / self.session
         
-        self.tbl_path = self.data_path / "tables" / f"{self.session}-fhc.mat"
+        self.tbl_path = self.data_path / "tables" / f"{self.session}.mat"
         self.figs_path = self.data_path / "figs" / f"{self.metadata['hardware_config'][self.probe_id]}_{self.metadata['probe_label'][self.probe_id]}"
     
     def preprocessing(self):

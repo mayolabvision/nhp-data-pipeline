@@ -68,6 +68,9 @@ def profile_to_mat(session, protocol=None):
     profile.prep_session_data()
 
     # Get only the part after "sorting"
-    sorter_path = str(profile.sorter_path).split("sorting", 1)[1].lstrip("/\\")
+    if profile.sorter_path is not None:
+        sorter_path = str(profile.sorter_path).split("sorting", 1)[1].lstrip("/\\")
+    else:
+        sorter_path = None
 
     return sorter_path
