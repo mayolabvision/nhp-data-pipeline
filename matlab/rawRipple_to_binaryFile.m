@@ -1,4 +1,4 @@
-function rawRipple_to_binaryFile(data_path,probes_path)
+function rawRipple_to_binaryFile(data_path,probes_path,probe_index)
 % Convert Ripple NS5 raw signals to a single binary file, for spike sorting
 %
 % This function reads raw neural signals from Ripple NS5 files in a session,
@@ -30,15 +30,13 @@ function rawRipple_to_binaryFile(data_path,probes_path)
 json_text = fileread(fullfile(data_path,'metadata.json'));
 metadata = jsondecode(json_text);
 
-pr_configs = metadata.probe_config(cellfun(@(q) isequal(q,'plexon'), metadata.probe_type));
-hw_configs = metadata.hardware_config(cellfun(@(q) isequal(q,'plexon'), metadata.probe_type));
-
-num_probes = numel(pr_configs);
-if num_probes == 0
+if ~isequal(metadata.probe_type{probe_index},'plexon')
     return
 end
 
-%if exist(fullfile(data_path,'ripple_info.json'), 'file') == 2
+hw_config = metadata.hardware_config{probe_index};
+
+%if exist(fullfile(data_path, [metadata.sess_name, '_', metadata.hardware_config{probe_index}], 'ripple_info.json'), 'file') == 2
 %    return
 %end
 
@@ -77,7 +75,7 @@ for i = 1:numel(nevnames)
     end
 end
 
-ns5_tasks = cell(length(nevnames),1);
+ns5_tasks = cell(sum(cellfun(@(q) ~contains(q,'fstm'), nevnames, 'uni', 1)),1);
 for nevnum = 1:length(nevnames)
     nevpath = nevpaths{nevnum};
     this_task = tasks{nevnum};
@@ -87,24 +85,20 @@ for nevnum = 1:length(nevnames)
         [~, out_ns5, ~] = extract_nevout(nevpath, 'KEEP_INT', true);
 
         if ~isempty(out_ns5.data(ismember(out_ns5.hdr.label, string(1:512)),1))
-            this_ns5 = [];
-            for p = 1:num_probes
-                this_prb = load(fullfile(probes_path,[pr_configs{p},'.mat']));
-                this_hw = hw_configs{p};
+            this_prb = load(fullfile(probes_path,[metadata.probe_config{probe_index},'.mat']));
 
-                if isequal(this_hw,"elecA")
-                    these_chans = this_prb.chanMap;
-                elseif isequal(this_hw,"elecB")
-                    these_chans = this_prb.chanMap+128;
-                elseif isequal(this_hw,"elecC")
-                    these_chans = this_prb.chanMap+256;
-                elseif isequal(this_hw,"elecD")
-                    these_chans = this_prb.chanMap+384;
-                end
-
-                % Channels x samples
-                this_ns5 = [this_ns5; out_ns5.data(ismember(out_ns5.hdr.label, string(these_chans)),:)];
+            if isequal(hw_config,"elecA")
+                these_chans = this_prb.chanMap;
+            elseif isequal(hw_config,"elecB")
+                these_chans = this_prb.chanMap+128;
+            elseif isequal(hw_config,"elecC")
+                these_chans = this_prb.chanMap+256;
+            elseif isequal(hw_config,"elecD")
+                these_chans = this_prb.chanMap+384;
             end
+
+            % Channels x samples
+            this_ns5 = out_ns5.data(ismember(out_ns5.hdr.label, string(these_chans)),:);
 
             % Save each task as samples x channels 
             ns5_tasks{nevnum} = this_ns5';
@@ -112,7 +106,6 @@ for nevnum = 1:length(nevnames)
             fprintf('\n---- no raw signal for %s ----\n', this_task);
             return
         end
-
     end
 end
 
@@ -120,7 +113,8 @@ end
 ns5_data = vertcat(ns5_tasks{:});
 
 % Saving data to binary file
-full_bin_path = fullfile(data_path,[metadata.sess_name,'.bin']); 
+full_bin_path = fullfile(data_path, [metadata.sess_name, '_', hw_config], 'raw_signal.bin'); 
+if ~exist(fileparts(full_bin_path),'dir'), mkdir(fileparts(full_bin_path)); end
 fid_data = fopen(full_bin_path, 'wb'); % Open file in append mode ('a')
 fwrite(fid_data, ns5_data, 'int16');
 fclose(fid_data);
@@ -136,7 +130,7 @@ ripple_info.gain_to_uV = out_ns5.hdr.scale(these_chans(1)); % e.g., 0.25 μV per
 ripple_info.offset_to_uV = 0;
 
 json_text = jsonencode(ripple_info, 'PrettyPrint', true);
-fid_info = fopen(fullfile(data_path, 'ripple_info.json'), 'w');
+fid_info = fopen(fullfile(data_path, [metadata.sess_name, '_', hw_config], 'ripple_info.json'), 'w');
 fwrite(fid_info, json_text, 'char');
 fclose(fid_info);
 
