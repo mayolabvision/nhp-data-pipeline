@@ -75,7 +75,8 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
     % re-arranging table to be easier to access data 
     tbl.trialName = cellfun(@(q) [TASK_NAME, '.', sprintf('%04d', q)], num2cell(1:height(tbl1))', 'uni', 0);
     tbl.trialName = categorical(string(tbl.trialName));
-    % tbl.block = tbl1.block;
+    tbl.block = tbl1.block;
+    tbl.time_sec = tbl1.time;
     
     % Pull out conditions from trial names, separated by ';' delimeter
     if any(contains(TASK_NAME, {'rfmp', 'rfMapping'}))
@@ -119,11 +120,6 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
         for c = 1:length(cols)
             tbl.(cols{c}) = conditions_matrix(:, c);
         end
-        % conditions = cellfun(@(x) cellfun(@(q,r) str2double(x(q+1:r-1)), num2cell(strfind(x,'=')), num2cell(strfind(x,';')), 'uni', 0), tbl1.text, 'uni', 0);
-        % conditions = cell2mat(vertcat(conditions{:}));
-        % for c=1:length(cols)
-        %     tbl.(cols{c}) = conditions(:,c);
-        % end
     end
 
     if any(contains(TASK_NAME, {'purs','pursuit'}))

@@ -1,4 +1,4 @@
-function [spikes_perTrial, clusters, trlAvg_frs] = parse_KilosortToTbl(tbl,si_path,varargin)
+function [spikes_perTrial, sorting, trlAvg_frs] = parse_SortingToTbl(tbl,si_path,varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 p = inputParser;
@@ -30,7 +30,7 @@ for i = 1:length(kilo_files1)
     end
     
     % Assign the first variable in the .mat file to the struct
-    clusters.(kname) = loaded_var;
+    sorting.(kname) = loaded_var;
 end
 
 % .tsv files
@@ -42,21 +42,16 @@ for ii = 1:length(kilo_files2)
     cfpath = fullfile(kilo_files2(ii).folder, kilo_files2(ii).name);
     %[~, cfname, ~] = fileparts(kilo_files2(ii).name);
     if ii==1
-        clusters = readtable(cfpath, 'FileType', 'text', 'Delimiter', '\t');
+        clusts = readtable(cfpath, 'FileType', 'text', 'Delimiter', '\t');
     else
         cc = readtable(cfpath, 'FileType', 'text', 'Delimiter', '\t');
-        cc2 = join(clusters, cc, 'Keys', 'cluster_id');
-        clusters = cc2;
+        cc2 = join(clusts, cc, 'Keys', 'cluster_id');
+        clusts = cc2;
     end
 end
-clusters.clusters = clusters; 
+sorting.clusters = clusts; 
 
-% clusters.KSLabel_clusters = categorical(clusters.KSLabel_clusters);
-
-% clusters.probe_index = repmat(imec_num+1, height(clusters), 1);
-% kilosort.clusters = movevars(clusters, 'probe_index', 'Before', 1);
-
-spike_times_sec = double(clusters.spike_times)./Fs;
+spike_times_sec = double(sorting.spike_times)./Fs;
 
 spikes_perTrial = cell(height(tbl),1);
 for t = 1:height(tbl)
@@ -64,14 +59,22 @@ for t = 1:height(tbl)
         disp(['Trial: ', num2str(t), '/', num2str(height(tbl))]);
     end
 
-    np = NP_ALIGN_PULSES(t);
-    rp = tbl.ALIGN_PULSE{t,1};
-    et =  tbl.END_TRIAL(t);
+    if isempty(NP_ALIGN_PULSES)
+        rp = tbl.time_sec(t,1);
+        et = tbl.time_sec(t,2);
 
-    spike_units = clusters.spike_clusters(spike_times_sec>=(np-(rp./1000)) & spike_times_sec<=(np+((et-rp)./1000)));
-    spike_times = ((spike_times_sec((spike_times_sec>=(np-(rp./1000)) & spike_times_sec<=(np+((et-rp)./1000)))) - np)*1000) + rp;
+        spike_units = sorting.spike_clusters(spike_times_sec>=rp & spike_times_sec<=et);
+        spike_times = ((spike_times_sec(spike_times_sec>=rp & spike_times_sec<=et)) - rp)*1000;
+    else
+        np = NP_ALIGN_PULSES(t);
+        rp = tbl.ALIGN_PULSE{t,1};
+        et =  tbl.END_TRIAL(t);
+    
+        spike_units = sorting.spike_clusters(spike_times_sec>=(np-(rp./1000)) & spike_times_sec<=(np+((et-rp)./1000)));
+        spike_times = ((spike_times_sec((spike_times_sec>=(np-(rp./1000)) & spike_times_sec<=(np+((et-rp)./1000)))) - np)*1000) + rp;   
+    end
 
-    spikes_perTrial{t} = cellfun(@(u) spike_times(spike_units==u), num2cell(double(unique(clusters.spike_clusters)+1)), 'uni', 0);
+    spikes_perTrial{t} = cellfun(@(u) spike_times(spike_units==u), num2cell(double(unique(sorting.spike_clusters)+1)), 'uni', 0);
 end
 
 spike_counts = cellfun(@(w) cellfun(@(q) numel(q), w, 'uni', 1), spikes_perTrial, 'uni', 0);
