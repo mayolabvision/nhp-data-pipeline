@@ -33,7 +33,7 @@ function ia_mdirRasters(data,varargin)
         load(data,'S');
         fprintf(sprintf('\n----Data loaded for %s----\n',filename))
     else
-        filename = data.sessionName;
+        filename = data.sess_name;
         S = data;
     end
 
