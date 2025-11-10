@@ -30,11 +30,13 @@ from probeinterface.io import read_probeinterface
 class PlexonProfile(RecordingProfile):
     def prep_session_data(self):
         # Pull out raw data and save to sub-folder for each probe
-        self.data_path = Path(RAW_DATA_PATH) / self.session
+        self.data_path = Path(RAW_DATA_PATH) / self.session / f"{self.session}_{self.metadata['hardware_config'][self.probe_id]}" 
         
-        self.probe_path = self.data_path / f"{self.session}_prbMap.json"
+        (self.data_path).mkdir(parents=True, exist_ok=True)
+ 
+        self.probe_path = self.data_path / "prbMap.json"
         if not (self.probe_path).is_file():
-            combine_probes(self.data_path, PROBES_PATH)
+            get_probe(self.data_path, PROBES_PATH, probe_id=self.probe_id)
  
         self.preprocess_hash = get_preprocess_hash(self.protocol["preprocessing"])    
         self.pp_hash, self.motion_hash, self.pp_params, self.motion_params = get_motion_hash(self.protocol['motion_correction'])
@@ -49,8 +51,8 @@ class PlexonProfile(RecordingProfile):
         self.analyzer_path = self.sorter_path / 'analyzer'
         self.metrics_path = self.sorter_path / 'quality_metrics'
         
-        self.tbl_path = self.data_path / "tables" / f"{self.session}-{self.full_hash}.mat"
-        self.figs_path = self.data_path / "figs" / self.full_hash / f"{self.metadata['hardware_config'][self.probe_id]}_{self.metadata['probe_label'][self.probe_id]}"
+        self.tbl_path = self.data_path.parent / "tables" / f"{self.session}-{self.full_hash}.mat"
+        self.figs_path = self.data_path.parent / "figs" / self.full_hash / f"{self.metadata['hardware_config'][self.probe_id]}_{self.metadata['probe_label'][self.probe_id]}"
         save_params(self.figs_path / "params.json", self.protocol)
     
     def preprocessing(self):
@@ -60,7 +62,7 @@ class PlexonProfile(RecordingProfile):
             with open(self.data_path / "ripple_info.json", "r") as f:
                 ripple_info = json.load(f)
  
-            raw_recording = read_binary(file_paths = self.data_path / f"{self.session}.bin", 
+            raw_recording = read_binary(file_paths = self.data_path / f"raw_signal.bin", 
                                         sampling_frequency = ripple_info["Fs"],
                                         num_channels = ripple_info["num_channels"],
                                         dtype = ripple_info["dtype_python"],
