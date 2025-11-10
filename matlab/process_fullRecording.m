@@ -79,7 +79,7 @@ function process_fullRecording(session_name,varargin)
     nevpaths = raw_filepaths(idx);
 
     % Define possible task keywords
-    task_keywords = {'rfmp', 'rfMapping', 'purs', 'pursuit', 'mdir', 'dirmem', 'fstm', 'cfix', 'frvw'};
+    task_keywords = {'rfmp', 'rfMapping', 'purs', 'pursuit', 'mdir', 'dirmem', 'fstm', 'cfix', 'frvw', 'oflu'};
     
     % Initialize cell array for tasks
     tasks = cell(size(nevnames));

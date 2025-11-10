@@ -1,0 +1,331 @@
+# ======================================
+# CONFIGURABLE SETTINGS (Modify These)
+# ======================================
+
+# Directories where data is stored
+$RawDataPath = "D:\"
+$ServerDataPath = "Z:\"
+$ProcessedDataPath = "Y:\lab_NHPdata-processed"
+$ClusterDataPath = "mayolab@h2p.crc.pitt.edu:\ix1\pmayo\lab_NHPdata\"
+
+# Directories where code and software are stored
+$PipelinePkgPath = "C:\Users\Rig2\nhp-data-pipeline\"
+$MatlabExePath = "C:\Program Files\MATLAB\R2019b\bin\matlab.exe"
+$ClusterNHPipePath = "/ihome/pmayo/mayolab/nhp-data-pipeline"
+
+# Remote ID and this machine's IP
+$sshUser = "mayolab@h2p.crc.pitt.edu"
+$localIP = "10.220.169.46"
+
+# Path to default metadata template
+$MetadataTemplatePath = "C:\Users\Rig2\Desktop\metadata_templates\kendra_scrappy_fhc.json"
+
+# =================================================
+# PROCESSING FUNCTIONS (Do Not Modify Unless Needed)
+# =================================================
+
+function find_rawdata_files {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$sessionName
+    )
+
+    if (-not $RawDataPath) {
+        Write-Host "Error: `$RawDataPath is not set." -ForegroundColor Red
+        return
+    }
+
+    # Build variants: with underscores as-is, and collapsed (underscores removed)
+    $variants = @($sessionName, ($sessionName -replace "_",""))
+
+    # Build regex patterns for each variant
+    $patterns = $variants | ForEach-Object {
+        "^{0}(?![0-9])" -f [Regex]::Escape($_)
+    }
+
+    Get-ChildItem -Path $RawDataPath -File |
+        Where-Object {
+            $name = $_.BaseName
+            $patterns | ForEach-Object { if ($name -match $_) { return $true } }
+            return $false
+        } |
+        Select-Object -ExpandProperty Name
+}
+
+function organize_rawdata_files {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$sessionName
+    )
+
+    if (-not $RawDataPath) {
+        Write-Host "Error: `$RawDataPath is not set." -ForegroundColor Red
+        return
+    }
+
+    Write-Host "Copying Ripple files from $RawDataPath to $ServerDataPath..." -ForegroundColor Cyan
+
+    # Find files
+    $files = find_rawdata_files $sessionName
+
+    if (-not $files) {
+        Write-Host "No files found for session '$sessionName'" -ForegroundColor Yellow
+        return
+    }
+
+    # Check if the neuropixel folder (sessionName_g0) exists
+    $fullSessionName = ($sessionName + "_g0")
+    $targetFolder = Join-Path $ServerDataPath ($sessionName + "_g0")
+
+    if (Test-Path -Path $targetFolder -PathType Container) {
+        # If neuropixel folder exists, use it
+        Write-Host "Neuropixel folder exists. Using target: $targetFolder"
+    } else {
+        # If neuropixel folder doesn't exist, use the default sessionName folder
+        $fullSessionName = $sessionName
+        $targetFolder = Join-Path $ServerDataPath $sessionName
+
+        # Create folder if it doesn't exist
+        if (-not (Test-Path $targetFolder)) {
+            New-Item -Path $targetFolder -ItemType Directory | Out-Null
+            Write-Host "Created directory: $targetFolder" -ForegroundColor Cyan
+        }
+    }
+
+    foreach ($f in $files) {
+        $sourcePath = Join-Path $RawDataPath $f
+
+        Write-Host "Copying $f to $targetFolder ..."
+        robocopy (Split-Path $sourcePath -Parent) $targetFolder $f /Z /MT:5 /V /XO /A-:SH | Out-Null
+    }
+
+    # Return the resolved target folder
+    return @($targetFolder, $fullSessionName)
+    Write-Host "File copying to server complete ..." -ForegroundColor Green
+    Write-Host "........................................................."
+}
+
+
+function create_metadata_json {
+    param(
+        [string]$sessionName,
+        [string]$MetadataTemplatePath,
+        [string]$targetFolder
+    )
+
+    if (-not (Test-Path $targetFolder)) {
+        New-Item -ItemType Directory -Path $targetFolder -Force | Out-Null
+    }
+
+    # Destination JSON path
+    $jsonFilePath = Join-Path $targetFolder "metadata.json"
+
+    if (-not (Test-Path $jsonFilePath)) {
+        # Copy the template JSON into place only if it doesn't already exist
+        Copy-Item -Path $MetadataTemplatePath -Destination $jsonFilePath -Force
+        Write-Host "Creating new metadata.json from template." -ForegroundColor Cyan
+    } else {
+        Write-Host "Opening existing metadata.json file." -ForegroundColor Cyan
+    }
+
+    # Open in Notepad for user editing
+    Start-Process notepad $jsonFilePath -Wait
+
+    Write-Host "Metadata JSON saved to $jsonFilePath" -ForegroundColor Green
+    Write-Host "........................................................."
+}
+
+function data_to_cluster {
+    param (
+        [string]$fullSessionName
+    )
+
+    $sourceDir = "$ServerDataPath$fullSessionName"
+    $remoteDir = "$ClusterDataPath$fullSessionName"
+
+    Write-Host "Copying data folder to $remoteDir..." -ForegroundColor Cyan
+    
+    scp -rp $sourceDir $remoteDir
+    
+    Write-Host "Transfer complete for session: $fullSessionName" -ForegroundColor Green
+
+    #----------------------------------------------------
+    Write-Host "Setting group read/write/execute permissions on remote directory..." -ForegroundColor Cyan
+    
+    # Convert to Linux path
+    $remoteDirLinux = ($remoteDir -replace '^[^:]+:', '') -replace '\\', '/'
+    ssh $sshUser "chmod -R g+rwx '$remoteDirLinux'"
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "Permissions updated successfully for $fullSessionName" -ForegroundColor Green
+    } else {
+        Write-Host "Warning: chmod command failed to execute on the remote host." -ForegroundColor Red
+    }
+
+    Write-Host "........................................................."
+}
+
+function cluster_to_shared {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$sessionName
+    )
+
+    $localSessionDir = Join-Path $ProcessedDataPath $sessionName
+
+    # Create the local session folder if it doesn't exist
+    if (-not (Test-Path $localSessionDir)) {
+        New-Item -ItemType Directory -Path $localSessionDir -Force | Out-Null
+        Write-Host "Created local directory: $localSessionDir" -ForegroundColor Green
+    } else {
+        Write-Host "Local directory already exists: $localSessionDir" -ForegroundColor Yellow
+    }
+
+    # Define remote 'tables' path
+    Write-Host "Copying remote 'tables' directory to $localSessionDir..." -ForegroundColor Cyan
+    $remoteFigsDir = "$ClusterDataPath$sessionName\tables"
+    scp -rp $remoteFigsDir $localSessionDir
+
+    Write-Host "Copy complete for session: $sessionName" -ForegroundColor Green
+    Write-Host "........................................................."
+}
+
+function submit_serial_jobs {
+    param (
+        [string]$sessionName,
+        [string]$protocolName
+    )
+
+    # Helper function to check job status
+    function Wait-ForJobCompletion {
+        param (
+            [string]$jobId,
+            [string]$sshUser,
+            [ValidateSet("smp", "gpu")]
+            [string]$partition = "smp"
+        )
+
+        Write-Host "Waiting for job $jobId to finish on partition '$partition'..." -ForegroundColor Cyan
+
+        $checkInterval = 10       # seconds between checks
+        $printInterval = 300      # seconds between status messages
+        $elapsed = 0
+
+        while ($true) {
+            # Build the squeue command based on partition type
+            if ($partition -eq "gpu") {
+                $squeueCmd = "squeue -M gpu -h -o '%A' | grep '^$jobId'"
+            } else {
+                $squeueCmd = "squeue -h -o '%A' | grep '^$jobId'"
+            }
+
+            # Query all job IDs still active that start with the base ID (to include _0, _1, etc.)
+            $status = ssh $sshUser $squeueCmd 2>$null
+
+            if ([string]::IsNullOrWhiteSpace($status)) {
+                Write-Host "Job $jobId has finished." -ForegroundColor Green
+                break
+            }
+
+            # Print a status message every 5 minutes
+            if ($elapsed -ge $printInterval) {
+                Write-Host "Job $jobId still running..."
+                $elapsed = 0
+            }
+
+            Start-Sleep -Seconds $checkInterval
+            $elapsed += $checkInterval
+        }
+    }
+
+    Write-Host "Submitting jobs for session '$sessionName' with protocol '$protocolName'..." -ForegroundColor Cyan
+
+    <#
+    Write-Host "PREPROCESSING.........................................."
+    $submitCmd = "cd $ClusterNHPipePath ; sbatch submit_preprocess.sh $sessionName $protocolName"
+    $submitOutput = ssh $sshUser $submitCmd
+
+    if ($submitOutput -match 'Submitted batch job (\d+)') {
+        $jobId = $matches[1]
+        Write-Host "Submitted job ID: $jobId" -ForegroundColor Green
+
+        Wait-ForJobCompletion -jobId $jobId -sshUser $sshUser -partition "smp"
+    } else {
+        Write-Host "Failed to parse job ID from submission output:" -ForegroundColor Red
+        Write-Host $submitOutput
+        return
+    }
+
+    Write-Host "SPIKE SORTING.........................................."
+    $submitCmd = "cd $ClusterNHPipePath ; sbatch submit_sorting.sh $sessionName $protocolName"
+    $submitOutput = ssh $sshUser $submitCmd
+
+    if ($submitOutput -match 'Submitted batch job (\d+)') {
+        $jobId = $matches[1]
+        Write-Host "Submitted job ID: $jobId" -ForegroundColor Green
+
+        Wait-ForJobCompletion -jobId $jobId -sshUser $sshUser -partition "gpu"
+    } else {
+        Write-Host "Failed to parse job ID from submission output:" -ForegroundColor Red
+        Write-Host $submitOutput
+        return
+    }
+
+    Write-Host "POSTPROCESSING.........................................."
+    $submitCmd = "cd $ClusterNHPipePath ; sbatch submit_postprocess.sh $sessionName $protocolName"
+    $submitOutput = ssh $sshUser $submitCmd
+
+    if ($submitOutput -match 'Submitted batch job (\d+)') {
+        $jobId = $matches[1]
+        Write-Host "Submitted job ID: $jobId" -ForegroundColor Green
+
+        Wait-ForJobCompletion -jobId $jobId -sshUser $sshUser -partition "smp"
+    } else {
+        Write-Host "Failed to parse job ID from submission output:" -ForegroundColor Red
+        Write-Host $submitOutput
+        return
+    }
+    #>
+
+    Write-Host "MATLAB TABLE.........................................."
+    $submitCmd = "cd $ClusterNHPipePath ; sbatch submit_matlabTbl.sh $sessionName $protocolName"
+    $submitOutput = ssh $sshUser $submitCmd
+
+    if ($submitOutput -match 'Submitted batch job (\d+)') {
+        $jobId = $matches[1]
+        Write-Host "Submitted job ID: $jobId" -ForegroundColor Green
+
+        # Wait for it to finish
+        Wait-ForJobCompletion -jobId $jobId -sshUser $sshUser -partition "smp"
+    } else {
+        Write-Host "Failed to parse job ID from submission output:" -ForegroundColor Red
+        Write-Host $submitOutput
+        return
+    }
+
+    Write-Host "All jobs completed for session '$sessionName'!" -ForegroundColor Green
+}
+
+############################################################################################################################
+function post_rip {
+     param(
+        [Parameter(Mandatory = $true)]
+        [string]$sessionName,
+
+        [Parameter(Mandatory = $true)]
+        [string]$protocolName
+    )
+
+    Write-Host "========================================================="
+    $targetFolder, $fullSessionName = organize_rawdata_files -sessionName $sessionName
+
+    create_metadata_json -targetFolder $targetFolder -sessionName $sessionName -MetadataTemplatePath $MetadataTemplatePath
+
+    data_to_cluster -fullSessionName $fullSessionName
+
+    submit_serial_jobs -sessionName $sessionName -protocolName $protocolName
+
+    cluster_to_shared -sessionName $sessionName
+
+    Write-Host "========================================================="
+}
