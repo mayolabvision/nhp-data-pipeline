@@ -26,7 +26,7 @@ from spikeinterface.qualitymetrics import compute_quality_metrics
 
 class NeuropixelProfile(RecordingProfile):
     def prep_session_data(self):
-        self.data_path = Path(RAW_DATA_PATH) / self.session / f"{self.session}_imec{self.probe_id}"
+        self.data_path = Path(RAW_DATA_PATH) / self.session / f"{self.session}_{self.metadata['hardware_config'][self.probe_id]}"
         
         self.preprocess_hash = get_preprocess_hash(self.protocol["preprocessing"])    
         self.pp_hash, self.motion_hash, self.pp_params, self.motion_params = get_motion_hash(self.protocol['motion_correction'])
