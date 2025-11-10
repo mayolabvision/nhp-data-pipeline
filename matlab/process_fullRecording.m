@@ -8,6 +8,7 @@ function process_fullRecording(session_name,varargin)
     % Default paths to add to the MATLAB path    
     defaultRAW_PATH  =  '/Volumes/lab_NHPdata';
     defaultOUT_PATH  =  '/Volumes/home/DATA';
+    defaultHELP_PATH  =  '/Users/kendranoneman/Projects/mayo/helperfunctions';
     defaultNEV_PATH  =  '/Users/kendranoneman/Packages/nevutils';
     defaultNET_PATH  =  '/Users/kendranoneman/Packages/nasnet';
     
@@ -15,6 +16,7 @@ function process_fullRecording(session_name,varargin)
     addRequired(p, 'session_name', @ischar);
     addParameter(p, 'RAW_DATA_PATH', defaultRAW_PATH, @ischar); 
     addParameter(p, 'OUT_DATA_PATH', defaultOUT_PATH, @ischar); 
+    addParameter(p, 'HELPERS_PATH', defaultHELP_PATH, @ischar); 
     addParameter(p, 'NEVUTIL_PATH', defaultNEV_PATH, @ischar);
     addParameter(p, 'NASNET_PATH', defaultNET_PATH, @ischar); % only used for plex
     addParameter(p, 'SORTER_PATH', [], @ischar);
@@ -23,6 +25,7 @@ function process_fullRecording(session_name,varargin)
     parse(p, session_name, varargin{:});
     RAW_PATH       =  p.Results.RAW_DATA_PATH;
     OUT_PATH       =  p.Results.OUT_DATA_PATH;
+    HELP_PATH       =  p.Results.HELPERS_PATH;
     NEV_PATH       =  p.Results.NEVUTIL_PATH;
     NET_PATH       =  p.Results.NASNET_PATH;
     SORTER_PATH    =  p.Results.SORTER_PATH;
