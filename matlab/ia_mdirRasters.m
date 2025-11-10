@@ -4,7 +4,7 @@ function ia_mdirRasters(data,varargin)
     p = inputParser;
     addRequired(p, 'data',  @(x) (ischar(x)) || isstruct(x));
     addParameter(p, 'FIG_PATH', [], @ischar);
-    addParameter(p, 'PROBE_INDEX', 1, @isnumeric);
+    addParameter(p, 'PROBE_INDEX', [], @isnumeric);
     addParameter(p, 'ALIGN', 'stim', @ischar);
     addParameter(p, 'X_LIMITS', [-300 500], @isnumeric)
     addParameter(p, 'Y_LIMITS', [], @isnumeric)

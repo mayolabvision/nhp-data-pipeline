@@ -56,6 +56,7 @@ function process_fullRecording(session_name,varargin)
         pupil_chan_label = metadata.HEeye_VEeye_diode_pupil{4};
 
         S1.sess_name = metadata.sess_name;
+        S1.metadata = metadata;
     else
         eye_chan_labels = {'10241','10242'};
         diode_chan_label = '10243';
