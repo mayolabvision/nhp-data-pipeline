@@ -36,9 +36,9 @@ end
 
 hw_config = metadata.hardware_config{probe_index};
 
-%if exist(fullfile(data_path, [metadata.sess_name, '_', metadata.hardware_config{probe_index}], 'ripple_info.json'), 'file') == 2
-%    return
-%end
+if exist(fullfile(data_path, [metadata.sess_name, '_', metadata.hardware_config{probe_index}], 'ripple_info.json'), 'file') == 2
+    return
+end
 
 filePattern = fullfile(data_path, '*.ns5');
 raw_files = dir(filePattern);

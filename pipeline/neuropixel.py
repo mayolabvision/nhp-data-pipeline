@@ -35,7 +35,7 @@ class NeuropixelProfile(RecordingProfile):
         save_params(self.preprocess_path.parent / "params.json", self.pp_params)
         
         self.sorter_hash, self.sorter_params, _ = get_sorter_hash(self.protocol['sorting'])
-        self.full_hash = "-".join([self.preprocess_hash, self.motion_hash, self.sorter_hash])
+        self.full_hash = "-".join([self.preprocess_hash, self.pp_hash, self.motion_hash, self.sorter_hash])
         self.sorter_path = self.data_path / "sorting" / self.full_hash
  
         self.analyzer_path = self.sorter_path / 'analyzer'
@@ -96,6 +96,8 @@ class NeuropixelProfile(RecordingProfile):
             print("Preprocessing of data compete!!!")
         else:
             print("Preprocessed data already exists, skipping this step")
+        
+        convert_npy_to_mat(self.preprocess_path)
     
     def spike_sorting(self):
         if not (self.sorter_path / 'params.json').is_file():

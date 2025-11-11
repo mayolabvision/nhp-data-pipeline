@@ -1,4 +1,5 @@
 import json
+import shutil
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
@@ -144,7 +145,7 @@ def combine_probes(session_path,
     
     print(f"Saved probe JSON to {json_path}")
 
-def get_probe(session_path,
+def get_probe(data_path,
               probes_path,
               probe_id=0,
               show_fig=False):
@@ -159,10 +160,12 @@ def get_probe(session_path,
         Directory where individual probe files are saved.
     """
     
-    session_path = Path(session_path)
-    with open(session_path / "metadata.json", "r") as f:
+    data_path = Path(data_path)
+    with open(data_path.parent / "metadata.json", "r") as f:
         metadata = json.load(f)
-    
+   
+    print(metadata)
+ 
     # Extract probes collected via Ripple system
     sess_name = metadata["sess_name"]
     probe_name = metadata["probe_config"][probe_id]
@@ -173,13 +176,9 @@ def get_probe(session_path,
         print(f"Probe map '{name}.json' does not exist in {probes_path}. It needs to be generated first.")
         return
     
-    pg = read_probeinterface(probe_path)
-    num_contacts = pg.get_contact_count()
-    pg.set_device_channel_indices(np.arange(num_contacts))
-    
-    json_path = session_path / f"{sess_name}_{self.metadata['probe_label'][self.probe_id]}" / "prbMap.json"
-    write_probeinterface(json_path, pg)
-    
+    json_path = data_path / "prbMap.json"
+    shutil.copy2(probe_path, json_path)   
+ 
     print(f"Saved probe JSON to {json_path}")
 
 

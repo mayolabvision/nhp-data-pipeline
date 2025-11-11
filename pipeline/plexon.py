@@ -24,7 +24,7 @@ from spikeinterface import create_sorting_analyzer, load_sorting_analyzer
 from spikeinterface.extractors import read_binary
 from spikeinterface.qualitymetrics import compute_quality_metrics
 
-from .ripple_probe_maker import combine_probes
+from .ripple_probe_maker import get_probe
 from probeinterface.io import read_probeinterface
 
 class PlexonProfile(RecordingProfile):
@@ -32,8 +32,6 @@ class PlexonProfile(RecordingProfile):
         # Pull out raw data and save to sub-folder for each probe
         self.data_path = Path(RAW_DATA_PATH) / self.session / f"{self.session}_{self.metadata['hardware_config'][self.probe_id]}" 
         
-        (self.data_path).mkdir(parents=True, exist_ok=True)
- 
         self.probe_path = self.data_path / "prbMap.json"
         if not (self.probe_path).is_file():
             get_probe(self.data_path, PROBES_PATH, probe_id=self.probe_id)
@@ -45,7 +43,7 @@ class PlexonProfile(RecordingProfile):
         save_params(self.preprocess_path.parent / "params.json", self.pp_params)
         
         self.sorter_hash, self.sorter_params, _ = get_sorter_hash(self.protocol['sorting'])
-        self.full_hash = "-".join([self.preprocess_hash, self.motion_hash, self.sorter_hash])
+        self.full_hash = "-".join([self.preprocess_hash, self.pp_hash, self.motion_hash, self.sorter_hash])
         self.sorter_path = self.data_path / "sorting" / self.full_hash
  
         self.analyzer_path = self.sorter_path / 'analyzer'
@@ -99,6 +97,8 @@ class PlexonProfile(RecordingProfile):
             print("Preprocessing of data compete!!!")
         else:
             print("Preprocessed data already exists, skipping this step")
+        
+        convert_npy_to_mat(self.preprocess_path)
 
     def spike_sorting(self):
         if not (self.sorter_path / 'params.json').is_file():
