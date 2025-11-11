@@ -160,12 +160,6 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
     tbl.params = tbl1.params;
     tbl.eyedata = tbl1.eyedata; tbl.pupil = tbl1.pupil; tbl.diode = tbl1.diode;
 
-    % eyePos = cellfun(@(x,y) filterEyeTraces_EyeLink(x(:,y:end),'SAMPLING_FREQUENCY',1000,'CUTOFF_FREQUENCY',84,'PLOT_TRIAL',false), tbl1.eyedata, trialStarts, 'uni', 0);
-    % eyeVel = cellfun(@(q) calcDerivative_eyeTraces(q), cellfun(@(x,y) filterEyeTraces_EyeLink(x(:,y:end),'SAMPLING_FREQUENCY',1000,'CUTOFF_FREQUENCY',40,'PLOT_TRIAL',false), tbl1.eyedata, trialStarts, 'uni', 0), 'uni', 0);
-    % eyeAcc = cellfun(@(q) calcDerivative_eyeTraces(q), eyeVel, 'uni', 0);
-
-    % tbl.eyePos = eyePos; tbl.eyeVel = eyeVel; tbl.eyeAcc = eyeAcc;
-
     if ismember('spiketimes', tbl1.Properties.VariableNames)
         tbl.spiketimes = tbl1.spiketimes; 
     end
