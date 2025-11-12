@@ -24,17 +24,17 @@ from spikeinterface import create_sorting_analyzer, load_sorting_analyzer
 from spikeinterface.extractors import read_binary
 from spikeinterface.qualitymetrics import compute_quality_metrics
 
-from .ripple_probe_maker import combine_probes
+from .ripple_probe_maker import get_probe
 from probeinterface.io import read_probeinterface
 
 class PlexonProfile(RecordingProfile):
     def prep_session_data(self):
         # Pull out raw data and save to sub-folder for each probe
-        self.data_path = Path(RAW_DATA_PATH) / self.session
+        self.data_path = Path(RAW_DATA_PATH) / self.session / f"{self.session}_{self.metadata['hardware_config'][self.probe_id]}" 
         
-        self.probe_path = self.data_path / f"{self.session}_prbMap.json"
+        self.probe_path = self.data_path / "prbMap.json"
         if not (self.probe_path).is_file():
-            combine_probes(self.data_path, PROBES_PATH)
+            get_probe(self.data_path, PROBES_PATH, probe_id=self.probe_id)
  
         self.preprocess_hash = get_preprocess_hash(self.protocol["preprocessing"])    
         self.pp_hash, self.motion_hash, self.pp_params, self.motion_params = get_motion_hash(self.protocol['motion_correction'])
@@ -43,14 +43,14 @@ class PlexonProfile(RecordingProfile):
         save_params(self.preprocess_path.parent / "params.json", self.pp_params)
         
         self.sorter_hash, self.sorter_params, _ = get_sorter_hash(self.protocol['sorting'])
-        self.full_hash = "-".join([self.preprocess_hash, self.motion_hash, self.sorter_hash])
+        self.full_hash = "-".join([self.preprocess_hash, self.pp_hash, self.motion_hash, self.sorter_hash])
         self.sorter_path = self.data_path / "sorting" / self.full_hash
  
         self.analyzer_path = self.sorter_path / 'analyzer'
         self.metrics_path = self.sorter_path / 'quality_metrics'
         
-        self.tbl_path = self.data_path / "tables" / f"{self.session}-{self.full_hash}.mat"
-        self.figs_path = self.data_path / "figs" / self.full_hash / f"{self.metadata['hardware_config'][self.probe_id]}_{self.metadata['probe_label'][self.probe_id]}"
+        self.tbl_path = self.data_path.parent / "tables" / f"{self.session}-{self.full_hash}.mat"
+        self.figs_path = self.data_path.parent / "figs" / self.full_hash / f"{self.metadata['hardware_config'][self.probe_id]}_{self.metadata['probe_label'][self.probe_id]}"
         save_params(self.figs_path / "params.json", self.protocol)
     
     def preprocessing(self):
@@ -60,7 +60,7 @@ class PlexonProfile(RecordingProfile):
             with open(self.data_path / "ripple_info.json", "r") as f:
                 ripple_info = json.load(f)
  
-            raw_recording = read_binary(file_paths = self.data_path / f"{self.session}.bin", 
+            raw_recording = read_binary(file_paths = self.data_path / f"raw_signal.bin", 
                                         sampling_frequency = ripple_info["Fs"],
                                         num_channels = ripple_info["num_channels"],
                                         dtype = ripple_info["dtype_python"],
@@ -97,6 +97,8 @@ class PlexonProfile(RecordingProfile):
             print("Preprocessing of data compete!!!")
         else:
             print("Preprocessed data already exists, skipping this step")
+        
+        convert_npy_to_mat(self.preprocess_path)
 
     def spike_sorting(self):
         if not (self.sorter_path / 'params.json').is_file():

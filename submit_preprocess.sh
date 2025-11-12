@@ -46,7 +46,7 @@ matlab -nodisplay <<EOF
 addpath(genpath('matlab'));
 addpath(genpath('${NEV_PATH}'));
 fprintf('Running rawRipple_to_binaryFile for ${SESSION}\n');
-rawRipple_to_binaryFile('${DATA_PATH}', '${PROBES_PATH}');
+rawRipple_to_binaryFile('${DATA_PATH}', '${PROBES_PATH}', $((PROBE_ID + 1)));
 exit
 EOF
 

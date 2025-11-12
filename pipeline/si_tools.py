@@ -46,9 +46,9 @@ def detect_probe_motion(recording, save_path):
                         localize_peaks_kwargs={'method': 'monopolar_triangulation'},
                         estimate_motion_kwargs={'win_scale_um': max_depth, 'motion_bound':800, 'time_kernel_width': 60})
 
-    np.save(save_path / 'medicine_motion.npy', motion.displacement[0])
-    np.save(save_path / 'medicine_time_bins.npy', motion.temporal_bins_s[0])
-    np.save(save_path / 'medicine_depth_bins.npy', motion.spatial_bins_um)
+    np.save(save_path / 'motion.npy', motion.displacement[0])
+    np.save(save_path / 'time_bins.npy', motion.temporal_bins_s[0])
+    np.save(save_path / 'depth_bins.npy', motion.spatial_bins_um)
     
 def run_preprocessing_with_motion_correction(raw_recording, protocol, preprocess_path):
     os.makedirs(preprocess_path, exist_ok=True)

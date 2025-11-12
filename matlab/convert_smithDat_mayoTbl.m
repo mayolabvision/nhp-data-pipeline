@@ -75,7 +75,8 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
     % re-arranging table to be easier to access data 
     tbl.trialName = cellfun(@(q) [TASK_NAME, '.', sprintf('%04d', q)], num2cell(1:height(tbl1))', 'uni', 0);
     tbl.trialName = categorical(string(tbl.trialName));
-    % tbl.block = tbl1.block;
+    tbl.block = tbl1.block;
+    tbl.time_sec = tbl1.time;
     
     % Pull out conditions from trial names, separated by ';' delimeter
     if any(contains(TASK_NAME, {'rfmp', 'rfMapping'}))
@@ -119,11 +120,6 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
         for c = 1:length(cols)
             tbl.(cols{c}) = conditions_matrix(:, c);
         end
-        % conditions = cellfun(@(x) cellfun(@(q,r) str2double(x(q+1:r-1)), num2cell(strfind(x,'=')), num2cell(strfind(x,';')), 'uni', 0), tbl1.text, 'uni', 0);
-        % conditions = cell2mat(vertcat(conditions{:}));
-        % for c=1:length(cols)
-        %     tbl.(cols{c}) = conditions(:,c);
-        % end
     end
 
     if any(contains(TASK_NAME, {'purs','pursuit'}))
@@ -163,12 +159,6 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
 
     tbl.params = tbl1.params;
     tbl.eyedata = tbl1.eyedata; tbl.pupil = tbl1.pupil; tbl.diode = tbl1.diode;
-
-    % eyePos = cellfun(@(x,y) filterEyeTraces_EyeLink(x(:,y:end),'SAMPLING_FREQUENCY',1000,'CUTOFF_FREQUENCY',84,'PLOT_TRIAL',false), tbl1.eyedata, trialStarts, 'uni', 0);
-    % eyeVel = cellfun(@(q) calcDerivative_eyeTraces(q), cellfun(@(x,y) filterEyeTraces_EyeLink(x(:,y:end),'SAMPLING_FREQUENCY',1000,'CUTOFF_FREQUENCY',40,'PLOT_TRIAL',false), tbl1.eyedata, trialStarts, 'uni', 0), 'uni', 0);
-    % eyeAcc = cellfun(@(q) calcDerivative_eyeTraces(q), eyeVel, 'uni', 0);
-
-    % tbl.eyePos = eyePos; tbl.eyeVel = eyeVel; tbl.eyeAcc = eyeAcc;
 
     if ismember('spiketimes', tbl1.Properties.VariableNames)
         tbl.spiketimes = tbl1.spiketimes; 
