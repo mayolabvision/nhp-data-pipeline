@@ -37,17 +37,17 @@ function ia_mdirRasters(data,varargin)
         S = data;
     end
 
-    units = S.kilosort([S.kilosort.probe_index] == PROBE_INDEX).clusters.cluster_id;
-    if ismember('best_channel',S.kilosort([S.kilosort.probe_index] == PROBE_INDEX).clusters.Properties.VariableNames)
-        chans =  S.kilosort([S.kilosort.probe_index] == PROBE_INDEX).clusters.best_channel;
+    units = S.sorting([S.sorting.probe_index] == PROBE_INDEX).clusters.cluster_id;
+    if ismember('best_channel',S.sorting([S.sorting.probe_index] == PROBE_INDEX).clusters.Properties.VariableNames)
+        chans =  S.sorting([S.sorting.probe_index] == PROBE_INDEX).clusters.best_channel;
     else
         chans = nan(numel(units),1);
     end
 
     if isempty(CLUSTER)
-        snrs  = S.kilosort([S.kilosort.probe_index] == PROBE_INDEX).clusters.snr;
-        depths = cellfun(@(q) q(2), S.kilosort([S.kilosort.probe_index] == PROBE_INDEX).clusters.unit_locations, 'uni', 1)./1000;
-        kslabs = S.kilosort([S.kilosort.probe_index] == PROBE_INDEX).clusters.KSLabel_clusters;
+        snrs  = S.sorting([S.sorting.probe_index] == PROBE_INDEX).clusters.snr;
+        depths = cellfun(@(q) q(2), S.sorting([S.sorting.probe_index] == PROBE_INDEX).clusters.unit_locations, 'uni', 1)./1000;
+        kslabs = S.sorting([S.sorting.probe_index] == PROBE_INDEX).clusters.KSLabel_clusters;
 
         if ~isnan(JOB_ID)
             all_units = units + 1;
@@ -71,8 +71,8 @@ function ia_mdirRasters(data,varargin)
         chans = chans(units==CLUSTER);
     end
 
-    probe_label = string(S.kilosort([S.kilosort.probe_index] == PROBE_INDEX).clusters.probe_label(1));
-    hardware_config = string(S.kilosort([S.kilosort.probe_index] == PROBE_INDEX).clusters.hardware_config(1));
+    probe_label = string(S.sorting([S.sorting.probe_index] == PROBE_INDEX).clusters.probe_label(1));
+    hardware_config = string(S.sorting([S.sorting.probe_index] == PROBE_INDEX).clusters.hardware_config(1));
 
     if ~isempty(FIG_PATH)
         FIG_PATH2 = fullfile(FIG_PATH, sprintf('%s_%s',hardware_config, probe_label), 'mdir_rasters', sprintf('%s_aligned',ALIGN));

@@ -178,6 +178,10 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
 
     %tbl.ns5_samps = tbl1.ns5_samps;
 
+    if ~iscell(tbl.FIXATE)
+        tbl.FIXATE = num2cell(tbl.FIXATE);
+    end
+
     %%%%%%%%%%%%% task-specific re-arranging and calculations %%%%%%%%%%%%%
     if any(contains(TASK_NAME, {'mdir', 'dirmem'}))
         tbl(:, 'MEM_GUIDED_SACC') = [];
@@ -267,10 +271,10 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
         end
 
         tbl.saccades = cell(height(tbl), 1);
-        validRows = cellfun(@(f) ~isempty(f) && all(~isnan(f)), num2cell(tbl.FIXATE));
+        validRows = cellfun(@(f) ~isempty(f) && all(~isnan(f)), tbl.FIXATE);
         tbl.saccades(validRows) = cellfun(@(v,f) ...
             num2cell(detect_saccades(v(:, f(1):end), 'VEL_THRESH', 30, 'ACC_THRESH', 500) + f(1), 2), ...
-            tbl.eyeVel(validRows), num2cell(tbl.FIXATE(validRows)), 'uni', 0);
+            tbl.eyeVel(validRows), tbl.FIXATE(validRows), 'uni', 0);
 
         [pursuitOnset, pursuitLatency] = cellfun(@(u,v,w) detect_pursuitOnset(u, v, w, 'PLOT_TRACES', false), tbl.eyeVel, num2cell(tbl.PURSUIT_TARG_ON), num2cell(tbl.pursuitSpeed), 'uni', 1); 
         tbl.pursuitOnset = pursuitOnset;
