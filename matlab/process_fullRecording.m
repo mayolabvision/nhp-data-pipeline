@@ -305,6 +305,8 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological
 
         tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
         tbl = removevars(tbl, 'time_sec');
+        tbl.spiketimes_1 = cellfun(@(x) iff(isnumeric(x), {x}, x), tbl.spiketimes_1, 'uni', 0);
+
        
         [~, fname, ~] = fileparts(nevpath);   % 'kendra_scrappy_0066a_mdir1'
         this_task = erase(fname, session_name); % 'a_mdir1'
@@ -334,7 +336,7 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological
         hashes = split(SORTER_PATH, '-');
         preprocess_hash = hashes{1}; pp_hash = hashes{2}; motion_hash = hashes{3}; %sorter_hash = hashes{4};
 
-        sorting_all = []; motion_info = struct([]);
+        sorting_all = [];
         for probe = 1:numel(metadata.probe_type)
 
             si_path = fullfile(RAW_PATH, session_name, [session_name, '_', metadata.hardware_config{probe}], 'sorting', SORTER_PATH);
@@ -360,7 +362,7 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological
                 tbl.imecLFP_samp = [trial_starts_lfp_samp trial_ends_lfp_samp];
 
                 % Pull out SpikeInterface sorting outputs
-                [spikes_perTrial,sorting,~] = parse_SortingToTbl(tbl,fullfile(si_path,'sorter_output'), 'NP_ALIGN_PULSES', these_alignTimes, 'Fs', ap_meta.imSampRate);
+                [spikes_perTrial,sorting,~] = parse_SortingToTbl(tbl, fullfile(si_path,'sorter_output'), 'NP_ALIGN_PULSES', these_alignTimes, 'Fs', ap_meta.imSampRate);
 
             end
 
@@ -394,21 +396,15 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological
                 load(fullfile(motion_path,'depth_bins.mat'));
                 load(fullfile(motion_path,'time_bins.mat'));
 
-                motion_info(probe).probe_index = probe;
-                motion_info(probe).probe_label = metadata.probe_label{probe};
-                motion_info(probe).probe_type = metadata.probe_type{probe};
-                motion_info(probe).probe_config = metadata.probe_config{probe};
-                motion_info(probe).hardware_config = metadata.hardware_config{probe};
-                motion_info(probe).probe_depth_mm = metadata.probe_depth_mm(probe);
-                motion_info(probe).motion = double(motion);
-                motion_info(probe).depth_bins = double(depth_bins);
-                motion_info(probe).time_bins = double(time_bins);
+                sorting.motion = double(motion);
+                sorting.depth_bins = double(depth_bins);
+                sorting.time_bins = double(time_bins);
 
                 sorting_all = [sorting_all; sorting];
             end
         end
 
-        if probe==numel(metadata.probe_type)
+        if nevnum==1
             jsonStr = fileread(fullfile(si_path,'params.json'));
             protocolStruct = jsondecode(jsonStr);
             S1.protocol = protocolStruct;
