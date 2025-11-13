@@ -4,8 +4,8 @@ function ia_ofluRasters(data,varargin)
     p = inputParser;
     addRequired(p, 'data',  @(x) (ischar(x)) || isstruct(x));
     addParameter(p, 'FIG_PATH', [], @ischar);
-    addParameter(p, 'PROBE_INDEX', [], @isnumeric);
-    addParameter(p, 'ALIGN', 'stim_on', @ischar);
+    addParameter(p, 'PROBE_INDEX', 1, @isnumeric);
+    addParameter(p, 'ALIGN', 'stim', @ischar);
     addParameter(p, 'X_LIMITS', [-100 700], @isnumeric)
     addParameter(p, 'Y_LIMITS', [], @isnumeric)
     addParameter(p, 'TICK_LENGTH', [], @isnumeric)
@@ -33,75 +33,50 @@ function ia_ofluRasters(data,varargin)
         load(data,'S');
         fprintf(sprintf('\n----Data loaded for %s----\n',filename))
     else
-        filename = data.sess_name;
         S = data;
     end
 
-    if ~isempty(PROBE_INDEX)
-        units = S.kilosort([S.kilosort.probe_index] == PROBE_INDEX).clusters.cluster_id;
-        if ismember('best_channel',S.kilosort([S.kilosort.probe_index] == PROBE_INDEX).clusters.Properties.VariableNames)
-            chans =  S.kilosort([S.kilosort.probe_index] == PROBE_INDEX).clusters.best_channel;
-        else
-            chans = nan(numel(units),1);
-        end
-    
-        if isempty(CLUSTER)
-            snrs  = S.kilosort([S.kilosort.probe_index] == PROBE_INDEX).clusters.snr;
-            depths = cellfun(@(q) q(2), S.kilosort([S.kilosort.probe_index] == PROBE_INDEX).clusters.unit_locations, 'uni', 1)./1000;
-            kslabs = S.kilosort([S.kilosort.probe_index] == PROBE_INDEX).clusters.KSLabel_clusters;
-    
-            if ~isnan(JOB_ID)
-                all_units = units + 1;
-                % Split into 50 chunks as a cell array
-                chunks = arrayfun(@(i) all_units(...
-                    floor((i-1)*numel(all_units)/N_CHUNKS)+1 : ...
-                    floor(i*numel(all_units)/N_CHUNKS)), ...
-                    1:N_CHUNKS, 'UniformOutput', false);
-                ids = (chunks{(JOB_ID+1)});
-    
-                units = units(ids);
-                chans = chans(ids);
-    
-                snrs = snrs(ids);
-                depths = depths(ids);
-                kslabs = kslabs(ids);
-    
-            end
-        else
-            units = CLUSTER;
-            chans = chans(units==CLUSTER);
-        end
-
-        probe_label = string(S.kilosort([S.kilosort.probe_index] == PROBE_INDEX).clusters.probe_label(1));
-        hardware_config = string(S.kilosort([S.kilosort.probe_index] == PROBE_INDEX).clusters.hardware_config(1));
-
-        prb_name = sprintf('spiketimes_%d',PROBE_INDEX);
+    units = S.sorting([S.sorting.probe_index] == PROBE_INDEX).clusters.cluster_id;
+    if ismember('best_channel',S.sorting([S.sorting.probe_index] == PROBE_INDEX).clusters.Properties.VariableNames)
+        chans =  S.sorting([S.sorting.probe_index] == PROBE_INDEX).clusters.best_channel;
     else
-        probe_label = 'SC?';
-        hardware_config = 'SC?';
-        prb_name = 'spiketimes';
-
-        units = [0,1];
-        chans = [2,2];
+        chans = nan(numel(units),1);
     end
 
+    if isempty(CLUSTER)
+
+        if ~isnan(JOB_ID)
+            all_units = units + 1;
+            % Split into 50 chunks as a cell array
+            chunks = arrayfun(@(i) all_units(...
+                floor((i-1)*numel(all_units)/N_CHUNKS)+1 : ...
+                floor(i*numel(all_units)/N_CHUNKS)), ...
+                1:N_CHUNKS, 'UniformOutput', false);
+            ids = (chunks{(JOB_ID+1)});
+
+            units = units(ids);
+            chans = chans(ids);
+        end
+    else
+        units = CLUSTER;
+        chans = chans(units==CLUSTER);
+    end
+
+    probe_label = string(S.sorting([S.sorting.probe_index] == PROBE_INDEX).clusters.probe_label(1));
+    hardware_config = string(S.sorting([S.sorting.probe_index] == PROBE_INDEX).clusters.hardware_config(1));
+
+    prb_name = sprintf('spiketimes_%d',PROBE_INDEX);
+
     if ~isempty(FIG_PATH)
-        FIG_PATH2 = fullfile(FIG_PATH, sprintf('%s_%s',hardware_config, probe_label), 'mdir_rasters', sprintf('%s_aligned',ALIGN));
+        FIG_PATH2 = fullfile(FIG_PATH, sprintf('%s_%s',hardware_config, probe_label), 'oflu_rasters', sprintf('%s_aligned', ALIGN));
         if ~exist(FIG_PATH2, 'dir'), mkdir(FIG_PATH2); end
     else
         FIG_PATH2 = [];
     end
 
-    if isequal(ALIGN,'stim_on')
+    if isequal(ALIGN,'stim')
         FR_WIN = [0,515];
         xlab = 'time aligned to stim onset (ms)';
-    elseif isequal(ALIGN,'stim_off')
-        FR_WIN = [50,150];
-        xlab = 'time aligned to stim offset (ms)';
-    elseif isequal(ALIGN,'fix_off')
-        FR_WIN = [0,100];
-        xlab = 'time aligned to fixation offset (ms)';
-
     end
 
     % Find mdir or dirmem fields
@@ -111,7 +86,7 @@ function ia_ofluRasters(data,varargin)
     T = []; 
     for mm = 1:numel(matchingFields)
         tt = S.(matchingFields{mm}).tbl;
-        vars = {'recColor', 'result', 'STIM_ON', 'STIM_OFF', 'trialName', prb_name, 'net_labels'};
+        vars = {'recColor', 'result', 'STIM_ON', 'STIM_OFF', 'trialName', prb_name};
         T = [T; tt(:, vars)];
     end
 
@@ -147,12 +122,12 @@ function ia_ofluRasters(data,varargin)
                 these_trls.trialName = categorical(regexprep( cellstr(these_trls.trialName), 'oflu\.(\d+)', 'oflu.${sprintf(''%04d'', str2double($1))}'));
                 these_trls = sortrows(these_trls, {'recColor', 'trialName'});
 
-                if isequal(ALIGN,'stim_on')
-                    sptimes = cellfun(@(w,v) w-v(1), cellfun(@(q) q{(unit+1)}, these_trls.(prb_name), 'uni', 0), num2cell(these_trls.STIM_ON), 'uni', 0);
-                elseif isequal(ALIGN,'stim_off')
-                    sptimes = cellfun(@(w,v) w-v(1), cellfun(@(q) q{(unit+1)}, these_trls.(prb_name), 'uni', 0), num2cell(these_trls.STIM_OFF), 'uni', 0);
-                elseif isequal(ALIGN,'fix_off')
-                    sptimes = cellfun(@(w,v) w-v(1), cellfun(@(q) q{(unit+1)}, these_trls.(prb_name), 'uni', 0), these_trls.FIX_OFF, 'uni', 0);
+                if isequal(ALIGN,'stim')
+                    if size(S.sorting,1) == 1
+                        sptimes = cellfun(@(w,v) w-v(1), these_trls.(prb_name), num2cell(these_trls.STIM_ON), 'uni', 0);
+                    else
+                        sptimes = cellfun(@(w,v) w-v(1), cellfun(@(q) q{(unit+1)}, these_trls.(prb_name), 'uni', 0), num2cell(these_trls.STIM_ON), 'uni', 0);
+                    end
                 end
 
                 netlabs = cellfun(@(q) q{(unit+1)}, these_trls.net_labels, 'uni', 0);
@@ -192,17 +167,10 @@ function ia_ofluRasters(data,varargin)
             han.XLabel.Visible='on';
             xlabel(han,{'';xlab},'fontsize',16);
 
-            if ~isempty(PROBE_INDEX)
-                title(han, {
-                    sprintf('%s --- %s --- cluster %d (channel %d)',S.sess_name, probe_label, unit, chans(u));
-                    sprintf('ks_label = %s, snr = %.4f, y_pos = %.2f um', kslabs{u}, snrs(u), depths(u)) 
-                }, 'fontsize',16,'interpreter','none')
-            else
-                title(han, {
-                sprintf('%s --- %s --- unit %d (channel %d)',S.sess_name, probe_label, unit, chans(u));
-                ''
-                }, 'fontsize',16,'interpreter','none')
-            end
+            title(han, {
+            sprintf('%s --- %s --- unit %d (channel %d)',S.sess_name, probe_label, unit, chans(u));
+            ''
+            }, 'fontsize',16,'interpreter','none')
         
             if ~isempty(FIG_PATH)
                 if SAVE_PDF
