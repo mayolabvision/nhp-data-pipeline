@@ -114,9 +114,9 @@ function S = addToTbl_KKN(data,varargin)
                 tbl.monkey = repmat(categorical("Y"),height(tbl),1);
             end
     
-            tbl.STIM_ON(tbl.result~='CORRECT') = cellfun(@(q) q(1:end-1), tbl.STIM_ON(tbl.result~='CORRECT'), 'uni', 0);
-            tbl.STIM_OFF(tbl.result~='CORRECT') = cellfun(@(q) q(1:end-1), tbl.STIM_OFF(tbl.result~='CORRECT'), 'uni', 0);
-            tbl.conditions = cellfun(@(q,v) q(1:numel(v)), tbl.conditions, tbl.STIM_ON, 'uni', 0);
+            % tbl.STIM_ON(tbl.result~='CORRECT') = cellfun(@(q) q(1:end-1), tbl.STIM_ON(tbl.result~='CORRECT'), 'uni', 0);
+            % tbl.STIM_OFF(tbl.result~='CORRECT') = cellfun(@(q) q(1:end-1), tbl.STIM_OFF(tbl.result~='CORRECT'), 'uni', 0);
+            % tbl.conditions = cellfun(@(q,v) q(1:numel(v)), tbl.conditions, tbl.STIM_ON, 'uni', 0);
             tbl = tbl(cellfun(@(q) ~isempty(q), tbl.conditions, 'uni', 1),:);
     
             eyePos = cellfun(@(x) filterEyeTraces_EyeLink(x), tbl.eyedata, 'uni', 0);
@@ -160,56 +160,56 @@ function S = addToTbl_KKN(data,varargin)
             mask = (spks >= (mean(spks, 1) - 3*std(spks, 0, 1))) & (spks <= (mean(spks, 1) + 3*std(spks, 0, 1)));
             tbl = tbl((sum(mask,2) < (mean(sum(mask,2)) + std(sum(mask,2))*3)) & (sum(mask,2) > (mean(sum(mask,2)) - std(sum(mask,2))*3)), :);
     
-            eyePos = cellfun(@(x) filterEyeTraces_EyeLink(x), tbl.eyedata, 'uni', 0);
-            [eyeVel, eyeAcc] = cellfun(@(x) calcDerivative_eyeTraces(x), eyePos, 'uni', 0);
+            % eyePos = cellfun(@(x) filterEyeTraces_EyeLink(x), tbl.eyedata, 'uni', 0);
+            % [eyeVel, eyeAcc] = cellfun(@(x) calcDerivative_eyeTraces(x), eyePos, 'uni', 0);
+            % 
+            % tbl.eyePos = eyePos; tbl.eyeVel = eyeVel; tbl.eyeAcc = eyeAcc;
     
-            tbl.eyePos = eyePos; tbl.eyeVel = eyeVel; tbl.eyeAcc = eyeAcc;
-    
-            saccades = cellfun(@(q) detect_saccades(q), cellfun(@(v,f) v(:,f(1):end), eyeVel, tbl.FIXATE, 'uni', 0), 'uni', 0);
-            tbl.saccades = cellfun(@(q,v) num2cell(q+v(1),2), saccades, tbl.FIXATE, 'uni', 0);
-    
-            tbl.saccadeOnset = nan(height(tbl),1);
-            for t = 1:height(tbl)
-                x = cellfun(@(q) q(1), tbl.saccades{t}, 'uni', 1) - tbl.SACCADE(t);
-                x(x>0)=NaN;
-                [~,m] = min(abs(x));
-    
-                tbl.saccadeOnset(t) = tbl.saccades{t}{m}(1);
-                tbl.saccadeOffset(t) = tbl.saccades{t}{m}(2);
-            end
-    
-            tbl.saccadeLatency = tbl.saccadeOnset - cell2mat(tbl.FIX_OFF);
+            % saccades = cellfun(@(q) detect_saccades(q), cellfun(@(v,f) v(:,f(1):end), eyeVel, tbl.FIXATE, 'uni', 0), 'uni', 0);
+            % tbl.saccades = cellfun(@(q,v) num2cell(q+v(1),2), saccades, tbl.FIXATE, 'uni', 0);
+            % 
+            % tbl.saccadeOnset = nan(height(tbl),1);
+            % for t = 1:height(tbl)
+            %     x = cellfun(@(q) q(1), tbl.saccades{t}, 'uni', 1) - tbl.SACCADE(t);
+            %     x(x>0)=NaN;
+            %     [~,m] = min(abs(x));
+            % 
+            %     tbl.saccadeOnset(t) = tbl.saccades{t}{m}(1);
+            %     tbl.saccadeOffset(t) = tbl.saccades{t}{m}(2);
+            % end
+            % 
+            % tbl.saccadeLatency = tbl.saccadeOnset - cell2mat(tbl.FIX_OFF);
             
             tbl = tbl(tbl.saccadeLatency>=100,:);
     
             % Det if first saccade out of fixation window landed in targ win
-            inTargets = nan(height(tbl),1); 
-            [dThetas,dRhos,dists] = deal(cell(height(tbl),1));
+            % inTargets = nan(height(tbl),1); 
+            % [dThetas,dRhos,dists] = deal(cell(height(tbl),1));
             for t = 1:height(tbl)
-                % radial position of eye at s
-                [theta_eye, rho_eye] = cart2pol(tbl.eyePos{t}(1,tbl.saccadeOffset(t)+50),tbl.eyePos{t}(2,tbl.saccadeOffset(t)+50));
-                rho_targ = tbl.distance(t);
-                theta_targ = deg2rad(tbl.angle(t));
-                r_window = pix2deg(tbl.params(t).block.targWinRad,tbl.params(t).block.screenDistance,tbl.params(t).block.pixPerCM);
-    
-                theta_eye = mod(theta_eye, 2*pi);
-                theta_targ = mod(theta_targ, 2*pi);
-    
-                % Signed difference: positive = clockwise
-                dThetas{t} = rad2deg(- (mod(theta_eye - theta_targ + pi, 2*pi) - pi));
-                dRhos{t} = rho_eye-rho_targ;
-    
-                % Compute distance using law of cosines
-                dist = sqrt(rho_eye.^2 + rho_targ^2 - 2*rho_eye*rho_targ.*cos(theta_eye - theta_targ));
-                dists{t} = dist;
-                
-                % Logical array: true if eye is inside target window
-                inTargets(t) = dist <= r_window;  
+            %     % radial position of eye at s
+            %     [theta_eye, rho_eye] = cart2pol(tbl.eyePos{t}(1,tbl.saccadeOffset(t)+50),tbl.eyePos{t}(2,tbl.saccadeOffset(t)+50));
+            %     rho_targ = tbl.distance(t);
+            %     theta_targ = deg2rad(tbl.angle(t));
+            %     r_window = pix2deg(tbl.params(t).block.targWinRad,tbl.params(t).block.screenDistance,tbl.params(t).block.pixPerCM);
+            % 
+            %     theta_eye = mod(theta_eye, 2*pi);
+            %     theta_targ = mod(theta_targ, 2*pi);
+            % 
+            %     % Signed difference: positive = clockwise
+            %     dThetas{t} = rad2deg(- (mod(theta_eye - theta_targ + pi, 2*pi) - pi));
+            %     dRhos{t} = rho_eye-rho_targ;
+            % 
+            %     % Compute distance using law of cosines
+            %     dist = sqrt(rho_eye.^2 + rho_targ^2 - 2*rho_eye*rho_targ.*cos(theta_eye - theta_targ));
+            %     dists{t} = dist;
+            % 
+            %     % Logical array: true if eye is inside target window
+            %     inTargets(t) = dist <= r_window;  
             end
-    
-            tbl.saccadeOffset_dTheta = dThetas;
-            tbl.saccadeOffset_dRho = dRhos;
-            tbl.saccadeOffset_dist = dists;
+            % 
+            % tbl.saccadeOffset_dTheta = dThetas;
+            % tbl.saccadeOffset_dRho = dRhos;
+            % tbl.saccadeOffset_dist = dists;
     
             tbl = tbl(inTargets==1,:);
         end
@@ -251,12 +251,12 @@ function S = addToTbl_KKN(data,varargin)
         
             tbl.eyePos = eyePos; tbl.eyeVel = eyeVel; tbl.eyeAcc = eyeAcc;
     
-            saccades = cellfun(@(q) detect_saccades(q, 'VEL_THRESH', 30, 'ACC_THRESH', 500), cellfun(@(v,f) v(:,f(1):end), eyeVel, num2cell(tbl.FIXATE), 'uni', 0), 'uni', 0);
-            tbl.saccades = cellfun(@(q,v) num2cell(q+v(1),2), saccades, num2cell(tbl.FIXATE), 'uni', 0);
-    
-            [pursuitOnset, pursuitLatency] = cellfun(@(u,v,w) detect_pursuitOnset(u, v, w, 'PLOT_TRACES', false), tbl.eyeVel, num2cell(tbl.PURSUIT_TARG_ON), num2cell(tbl.pursuitSpeed), 'uni', 1); 
-            tbl.pursuitOnset = pursuitOnset;
-            tbl.pursuitLatency = pursuitLatency;
+            % saccades = cellfun(@(q) detect_saccades(q, 'VEL_THRESH', 30, 'ACC_THRESH', 500), cellfun(@(v,f) v(:,f(1):end), eyeVel, num2cell(tbl.FIXATE), 'uni', 0), 'uni', 0);
+            % tbl.saccades = cellfun(@(q,v) num2cell(q+v(1),2), saccades, num2cell(tbl.FIXATE), 'uni', 0);
+            % 
+            % [pursuitOnset, pursuitLatency] = cellfun(@(u,v,w) detect_pursuitOnset(u, v, w, 'PLOT_TRACES', false), tbl.eyeVel, num2cell(tbl.PURSUIT_TARG_ON), num2cell(tbl.pursuitSpeed), 'uni', 1); 
+            % tbl.pursuitOnset = pursuitOnset;
+            % tbl.pursuitLatency = pursuitLatency;
     
             tbl = tbl(tbl.pursuitLatency >= 60 & tbl.pursuitLatency < 150,:);
     

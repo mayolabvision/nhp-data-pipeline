@@ -1,4 +1,4 @@
-function [dat, epochEnd, tempdata] = format_datTrials(nev, out_ns5, varargin)
+function [dat, epochEnd, tempdata, channels] = format_datTrials(nev, out_ns5, varargin)
     % format_datTrials - Processes neural and behavioral data for multiple trials, 
     % extracts eye and spike data, and formats the information into a structured array.
     %
@@ -52,6 +52,7 @@ function [dat, epochEnd, tempdata] = format_datTrials(nev, out_ns5, varargin)
     addRequired(p, 'nev', @(x) (isnumeric(x)) || isstruct(x));
     addRequired(p, 'out_ns5', @isstruct);
     addParameter(p, 'NEURAL_CHANNELS', [], @isnumeric);
+    addParameter(p, 'PROBE_INDEX', 1, @isnumeric);
     addParameter(p, 'EYE_CHAN_LABELS', defaultEyeChanLabels, (@(x) iscell(x))); % eye channel labels
     addParameter(p, 'DIODE_CHAN_LABEL', '10243', @ischar); % diode channel label
     addParameter(p, 'PUPIL_CHAN_LABEL', '10244', @ischar); % pupil channel label
@@ -64,6 +65,7 @@ function [dat, epochEnd, tempdata] = format_datTrials(nev, out_ns5, varargin)
     nev = p.Results.nev;
     out_ns5 = p.Results.out_ns5;
     neural_channels = p.Results.NEURAL_CHANNELS;
+    probe_index = p.Results.PROBE_INDEX;
     eye_channel_labels = p.Results.EYE_CHAN_LABELS;
     pupil_channel_label = p.Results.PUPIL_CHAN_LABEL;
     diode_channel_label = p.Results.DIODE_CHAN_LABEL;
@@ -84,7 +86,7 @@ function [dat, epochEnd, tempdata] = format_datTrials(nev, out_ns5, varargin)
     
     % Determine if nev is an array of struct; if so, extract nev data
     if isequal(class(nev), 'struct')
-        NEV = [nev.nev nev.net_labels']; % Combine event and neural network labels
+        NEV = [nev.nev nev.net_labels']; % nev.waveforms]; % Combine event and neural network labels
         spike_sort = true; % Flag for spike sorting
     else
         NEV = nev;
@@ -117,7 +119,7 @@ function [dat, epochEnd, tempdata] = format_datTrials(nev, out_ns5, varargin)
         digcodes = this_nev(diginnevind, :);
 
         channels = unique(NEV(NEV(:,1) ~= 0,1:2),'rows');
-        channels = channels(channels(:,1) ~= 0 & ismember(channels(:, 1), 1:400),:);
+        channels = channels(channels(:,1) ~= 0 & ismember(channels(:,1), neural_channels) & channels(:,2) ~= 0,:);
     
         % Find trial start and end indices
         trialstartindstemp = find(digcodes(:, 2) == starttrial);
@@ -246,27 +248,19 @@ function [dat, epochEnd, tempdata] = format_datTrials(nev, out_ns5, varargin)
             % Process neural spikes, if applicable
             if ~isempty(neural_channels)
                 spks = this_trial(ismember(this_trial(:, 1), neural_channels), :);
-                sortcodes = unique(spks(:,2));
-                [spks_byChan, netLabels_byChan, waveforms_byChan] = deal(cell(1,size(neural_channels, 1)));
 
-                for c = 1:numel(neural_channels)
-                    [spks_byUnit, netLabels_byUnit, waveforms_byUnit] = deal(cell(1,numel(sortcodes)));
-                    for u = 1:numel(sortcodes)
-                        spks_byUnit{u} = ((spks(spks(:,1) == neural_channels(c) & spks(:,2) == sortcodes(u), 3)') - trialstarts(n)) .* 1000;
-                        if spike_sort
-                            netLabels_byUnit{u} = (spks(spks(:,1) == neural_channels(c) & spks(:,2) == sortcodes(u), 4)');
-                            waveforms_byUnit{u} = (spks(spks(:,1) == neural_channels(c) & spks(:,2) == sortcodes(u), 5:end)');
-                        end
-                    end
-                    spks_byChan{c} = spks_byUnit;
+                [spks_byUnit, netLabels_byUnit] = deal(cell(1,size(channels, 1)));
+                for u = 1:size(channels,1)
+                    spks_byUnit{u} = ((spks(spks(:,1) == channels(u,1) & spks(:,2) == channels(u,2), 3)') - trialstarts(n)) .* 1000;
                     if spike_sort
-                        netLabels_byChan{c} = netLabels_byUnit;
-                        waveforms_byChan{c} = waveforms_byUnit;
+                        netLabels_byUnit{u} = (spks(spks(:,1) == channels(u,1) & spks(:,2) == channels(u,2), 4)');
+                        %waveforms_byUnit{u} = (spks(spks(:,1) == channels(u,1) & spks(:,2) == channels(u,2), 5:end)');
                     end
                 end
-                dat(n).spiketimes = spks_byChan; % Store spike times
+
+                dat(n).(sprintf('spiketimes_%d', probe_index)) = spks_byUnit; % Store spike times
                 if spike_sort
-                    dat(n).net_labels = netLabels_byChan; % Store spike sorting labels
+                    dat(n).(sprintf('netlabels_%d', probe_index)) = netLabels_byUnit; % Store spike sorting labels
                 end
             end
     

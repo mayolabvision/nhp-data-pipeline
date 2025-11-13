@@ -46,11 +46,14 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
     %
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+    defaultHELP_PATH  =  '/Users/kendranoneman/Projects/mayo/helperfunctions';
+
     % Create an input parser
     p = inputParser;
     addRequired(p, 'dat', @(x) (isnumeric(x)) || isstruct(x));
     addParameter(p, 'TASK_NAME', [], @ischar)
     addParameter(p, 'LFP', []);
+    addParameter(p, 'HELPERS_PATH', defaultHELP_PATH, @ischar)
 
     % Parse the inputs
     parse(p, dat, varargin{:});
@@ -59,6 +62,9 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
     dat = p.Results.dat;
     TASK_NAME = p.Results.TASK_NAME;
     LFP = p.Results.LFP;
+    HELPERS_PATH = p.Results.HELPERS_PATH;
+
+    addpath(fullfile(HELPERS_PATH,'behavior'));
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     if isempty(TASK_NAME)
@@ -77,6 +83,38 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
     tbl.trialName = categorical(string(tbl.trialName));
     tbl.block = tbl1.block;
     tbl.time_sec = tbl1.time;
+
+    if iscell(tbl1.result)
+        tbl.result = convertBetween_eventCodes_eventNames(tbl1.result);
+    else
+        tbl.result = convertBetween_eventCodes_eventNames(num2cell(tbl1.result));
+    end
+    tbl.result = categorical(string(tbl.result));
+
+
+    % Make array of times of start/end time per trial, for aligning with trial codes and indexing eye data
+    times_ms = cellfun(@(q) round(q(1)*1000:(q(2)+1)*1000), num2cell(tbl1.time,2), 'uni', 0);
+    trialStarts = cellfun(@(q,r) find(q == round(r(r(:,2)==1,3)*1000)), times_ms, tbl1.trialcodes, 'uni', 0);
+    eventCodes = tbl1.trialcodes; eventCodes = vertcat(eventCodes{:});
+    eventCodes = num2cell(sort(unique(eventCodes(:,2))))';
+
+    eventNames = convertBetween_eventCodes_eventNames(eventCodes);
+    trialMarkers = cellfun(@(t) cellfun(@(q,r) find(ismember(q,round(r(r(:,2)==t,3)*1000))), times_ms, tbl1.trialcodes, 'uni', 0), eventCodes, 'uni', 0)';
+    trialMarkers = horzcat(trialMarkers{:});
+    trialMarkers(cellfun('isempty',trialMarkers)) = {NaN};
+
+    for m=1:length(eventNames)
+        if sum(cellfun(@(q) size(q,1)>1, trialMarkers(:,m), 'uni', 1))>0 || sum(cellfun(@(q) size(q,2)>1, trialMarkers(:,m), 'uni', 1))>0
+            if numel(unique(cellfun(@numel ,trialMarkers(:,m),'uni',1))) == 1
+                codeSplt = cellfun(@(q) num2cell(q), trialMarkers(:,m), 'uni', 0);
+                tbl.(eventNames{m}) = vertcat(codeSplt{:});
+            else
+                tbl.(eventNames{m}) = trialMarkers(:,m);
+            end
+        else
+            tbl.(eventNames{m}) = cell2mat(trialMarkers(:,m));
+        end
+    end
     
     % Pull out conditions from trial names, separated by ';' delimeter
     if any(contains(TASK_NAME, {'rfmp', 'rfMapping'}))
@@ -89,6 +127,10 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
         % Apply the function to each cell in conditions
         conditions = cellfun(@(q) pix2deg(q, tbl1(1,:).params.block.screenDistance, tbl1(1,:).params.block.pixPerCM), cellfun(process_string, tbl1.text, 'uni', 0), 'uni', 0);
         tbl.conditions = cellfun(@(q) num2cell(q,2), conditions, 'uni', 0);
+
+        tbl.STIM_ON(tbl.result~='CORRECT') = cellfun(@(q) q(1:end-1), tbl.STIM_ON(tbl.result~='CORRECT'), 'uni', 0);
+        tbl.STIM_OFF(tbl.result~='CORRECT') = cellfun(@(q) q(1:end-1), tbl.STIM_OFF(tbl.result~='CORRECT'), 'uni', 0);
+        tbl.conditions = cellfun(@(q,v) q(1:numel(v)), tbl.conditions, tbl.STIM_ON, 'uni', 0);
 
     else
         pattern = '([^0-9;]+)(?==)';
@@ -126,114 +168,15 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
         tbl1.result(tbl1.result==0 | tbl1.result==154) = 167;
     end
 
-    if iscell(tbl1.result)
-        tbl.result = convertBetween_eventCodes_eventNames(tbl1.result);
-    else
-        tbl.result = convertBetween_eventCodes_eventNames(num2cell(tbl1.result));
-    end
-    tbl.result = categorical(string(tbl.result));
-
-    % Make array of times of start/end time per trial, for aligning with trial codes and indexing eye data
-    times_ms = cellfun(@(q) round(q(1)*1000:(q(2)+1)*1000), num2cell(tbl1.time,2), 'uni', 0);
-    trialStarts = cellfun(@(q,r) find(q == round(r(r(:,2)==1,3)*1000)), times_ms, tbl1.trialcodes, 'uni', 0);
-    eventCodes = tbl1.trialcodes; eventCodes = vertcat(eventCodes{:});
-    eventCodes = num2cell(sort(unique(eventCodes(:,2))))';
-
-    eventNames = convertBetween_eventCodes_eventNames(eventCodes);
-    trialMarkers = cellfun(@(t) cellfun(@(q,r) find(ismember(q,round(r(r(:,2)==t,3)*1000))), times_ms, tbl1.trialcodes, 'uni', 0), eventCodes, 'uni', 0)';
-    trialMarkers = horzcat(trialMarkers{:});
-    trialMarkers(cellfun('isempty',trialMarkers)) = {NaN};
-
-    for m=1:length(eventNames)
-        if sum(cellfun(@(q) size(q,1)>1, trialMarkers(:,m), 'uni', 1))>0 || sum(cellfun(@(q) size(q,2)>1, trialMarkers(:,m), 'uni', 1))>0
-            if numel(unique(cellfun(@numel ,trialMarkers(:,m),'uni',1))) == 1
-                codeSplt = cellfun(@(q) num2cell(q), trialMarkers(:,m), 'uni', 0);
-                tbl.(eventNames{m}) = vertcat(codeSplt{:});
-            else
-                tbl.(eventNames{m}) = trialMarkers(:,m);
-            end
-        else
-            tbl.(eventNames{m}) = cell2mat(trialMarkers(:,m));
-        end
-    end
-
     tbl.params = tbl1.params;
     tbl.eyedata = tbl1.eyedata; tbl.pupil = tbl1.pupil; tbl.diode = tbl1.diode;
 
-    if ismember('spiketimes', tbl1.Properties.VariableNames)
-        tbl.spiketimes = tbl1.spiketimes; 
-    end
-    
-    if ismember('net_labels', tbl1.Properties.VariableNames)
-        tbl.net_labels = tbl1.net_labels;
-    end
-
-    if ~isempty(LFP)
-        tbl.lfp = LFP;
-    end
+    % Add filtered eye traces and kinematic derivatives
+    eyePos = cellfun(@(x) filterEyeTraces_EyeLink(x), tbl.eyedata, 'uni', 0);
+    [eyeVel, eyeAcc] = cellfun(@(x) calcDerivative_eyeTraces(x), eyePos, 'uni', 0);
+    tbl.eyePos = eyePos; tbl.eyeVel = eyeVel; tbl.eyeAcc = eyeAcc;
 
     %tbl.ns5_samps = tbl1.ns5_samps;
-
-
-    %%%%%%%%%%%%%%%% TEMPORARY CODE FOR ANI %%%%%%%%%%%%%%%%%%%%%
-    if ismember('SACCADE_BLOCK', tbl.Properties.VariableNames) && ismember('PURSUIT_BLOCK', tbl.Properties.VariableNames)
-        tbl.blockType = cell(size(tbl, 1), 1);
-        tbl.blockType(~isnan(tbl.SACCADE_BLOCK)) = {'mdir'};
-        tbl.blockType(~isnan(tbl.PURSUIT_BLOCK)) = {'purs'};
-
-        tbl = movevars(tbl,{'blockType'},'After','trialName');
-
-        tbl.SACCADE_BLOCK = [];
-        tbl.PURSUIT_BLOCK = [];
-
-        tbl.blockType = categorical(string(tbl.blockType));
-        tbl.distance(tbl.blockType=='pursuit') = NaN;
-        tbl.jump(tbl.blockType=='saccade') = NaN;
-        tbl.pursuitSpeed(tbl.blockType=='saccade') = NaN;
-        tbl.pursuit_fixDuration(tbl.blockType=='saccade') = NaN;
-
-        % changing distance to be in deg
-        tbl.distance = cellfun(@(q) round(pix2deg(q, tbl(1,:).params.block.screenDistance, tbl(1,:).params.block.pixPerCM)), num2cell(tbl.distance), 'uni', 1);
-
-        % Create empty columns for pursuit-related variables
-        tbl.pursuitOnset = nan(height(tbl), 1);
-        tbl.pursuitLatency = nan(height(tbl), 1);
-        tbl.msOffset = nan(height(tbl), 1);
-        tbl.CROSSING_TIME = nan(height(tbl), 1);
-        tbl.csTimes = nan(height(tbl), 3);
-        tbl.csVelocity = nan(height(tbl), 1);
-        tbl.csAngle = nan(height(tbl), 1);
-        tbl.pursType = repmat({'NaN'}, height(tbl), 1);
-
-        rowsForPursuit = find(tbl.blockType=='purs');
-        
-        % Loop over only the relevant rows for pursuit
-        for t = find(rowsForPursuit)'
-            if isequal(tbl.result(t), "CORRECT") && length(tbl.TARG_ON{t})==1
-                [pursuit_onset, rxnTime, msOffset, csOnset, csVelocity, csPeak, csOffset, csAngle, csType] = detect_pursuitOnset(tbl.eyePos{t}, tbl.eyeVel{t}, tbl.TARG_ON{t}, tbl(t,:).params.block.crossingTime, tbl.pursuitSpeed(t), tbl.newAngle(t), 'PLOT_TRACES', false);
-                
-                tbl.pursuitOnset(t) = pursuit_onset;
-                tbl.pursuitLatency(t) = rxnTime;
-                tbl.msOffset(t) = msOffset;
-                tbl.csTimes(t, :) = [csOnset, csPeak, csOffset];
-                tbl.csVelocity(t) = csVelocity;
-                tbl.csAngle(t) = csAngle;
-                tbl.pursType{t} = csType;
-            else
-                tbl.pursType{t} = 'NaN';
-            end
-            
-            if isequal(tbl.result(t), 'CORRECT')
-                tbl.CROSSING_TIME(t) = tbl(t,:).params.block.crossingTime;
-            end
-        end
-        
-        tbl.pursType = categorical(string(tbl.pursType));
-        
-        tbl = movevars(tbl,{'pursuitOnset','pursuitLatency','msOffset','pursType','csTimes','csVelocity','csAngle'},'Before','result');
-        tbl = movevars(tbl,{'CROSSING_TIME'},'After','TARG_ON');
-        
-    end
 
     %%%%%%%%%%%%% task-specific re-arranging and calculations %%%%%%%%%%%%%
     if any(contains(TASK_NAME, {'mdir', 'dirmem'}))
@@ -251,9 +194,52 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
             tbl = movevars(tbl,{'targetOnsetDelay','delay','fixDuration'},'Before','result');
         end
 
-        %if ~iscell(tbl.FIX_OFF) 
-        %    tbl.FIX_OFF = num2cell(tbl.FIX_OFF);
-        %end
+        tbl.saccades = cell(height(tbl), 1);
+        validRows = cellfun(@(f) ~isempty(f) && all(~isnan(f)), tbl.FIXATE);
+        tbl.saccades(validRows) = cellfun(@(v,f) ...
+            num2cell(detect_saccades(v(:, f(1):end)) + f(1), 2), ...
+            tbl.eyeVel(validRows), tbl.FIXATE(validRows), 'uni', 0);
+
+        tbl.saccadeOnset = nan(height(tbl),1);
+        for t = 1:height(tbl)
+            x = cellfun(@(q) q(1), tbl.saccades{t}, 'uni', 1) - tbl.SACCADE(t);
+            x(x>0)=NaN;
+            [~,m] = min(abs(x));
+
+            tbl.saccadeOnset(t) = tbl.saccades{t}{m}(1);
+            tbl.saccadeOffset(t) = tbl.saccades{t}{m}(2);
+        end
+        
+        tbl.saccadeLatency = tbl.saccadeOnset - cell2mat(tbl.FIX_OFF);
+
+        % Det if first saccade out of fixation window landed in targ win
+        inTargets = nan(height(tbl),1); 
+        [dThetas,dRhos,dists] = deal(cell(height(tbl),1));
+        for t = 1:height(tbl)
+            % radial position of eye at s
+            [theta_eye, rho_eye] = cart2pol(tbl.eyePos{t}(1,tbl.saccadeOffset(t)+50),tbl.eyePos{t}(2,tbl.saccadeOffset(t)+50));
+            rho_targ = tbl.distance(t);
+            theta_targ = deg2rad(tbl.angle(t));
+            r_window = pix2deg(tbl.params(t).block.targWinRad,tbl.params(t).block.screenDistance,tbl.params(t).block.pixPerCM);
+
+            theta_eye = mod(theta_eye, 2*pi);
+            theta_targ = mod(theta_targ, 2*pi);
+
+            % Signed difference: positive = clockwise
+            dThetas{t} = rad2deg(- (mod(theta_eye - theta_targ + pi, 2*pi) - pi));
+            dRhos{t} = rho_eye-rho_targ;
+
+            % Compute distance using law of cosines
+            dist = sqrt(rho_eye.^2 + rho_targ^2 - 2*rho_eye*rho_targ.*cos(theta_eye - theta_targ));
+            dists{t} = dist;
+            
+            % Logical array: true if eye is inside target window
+            inTargets(t) = dist <= r_window;  
+        end
+
+        tbl.saccadeOffset_dTheta = dThetas;
+        tbl.saccadeOffset_dRho = dRhos;
+        tbl.saccadeOffset_dist = dists;
 
     elseif any(contains(TASK_NAME, {'purs','pursuit'}))
         % Define the columns to replace and their new names
@@ -279,22 +265,61 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
             end
             tbl = movevars(tbl,{'jump'},'Before','fixDuration');
         end
+
+        tbl.saccades = cell(height(tbl), 1);
+        validRows = cellfun(@(f) ~isempty(f) && all(~isnan(f)), num2cell(tbl.FIXATE));
+        tbl.saccades(validRows) = cellfun(@(v,f) ...
+            num2cell(detect_saccades(v(:, f(1):end), 'VEL_THRESH', 30, 'ACC_THRESH', 500) + f(1), 2), ...
+            tbl.eyeVel(validRows), num2cell(tbl.FIXATE(validRows)), 'uni', 0);
+
+        [pursuitOnset, pursuitLatency] = cellfun(@(u,v,w) detect_pursuitOnset(u, v, w, 'PLOT_TRACES', false), tbl.eyeVel, num2cell(tbl.PURSUIT_TARG_ON), num2cell(tbl.pursuitSpeed), 'uni', 1); 
+        tbl.pursuitOnset = pursuitOnset;
+        tbl.pursuitLatency = pursuitLatency;
+
+    elseif any(contains(TASK_NAME, {'rfmp', 'rfMapping'}))
+        tbl.saccades = cell(height(tbl), 1);
+        validRows = cellfun(@(f) ~isempty(f) && all(~isnan(f)), tbl.FIXATE);
+        tbl.saccades(validRows) = cellfun(@(v,f) ...
+            num2cell(detect_saccades(v(:, f(1):end)) + f(1), 2), ...
+            tbl.eyeVel(validRows), tbl.FIXATE(validRows), 'uni', 0);
     end
 
-    if ismember('emptyCnd', tbl.Properties.VariableNames)
-        tbl.emptyCnd = [];
-    end
-
-    if ismember('STIM8_ON', tbl.Properties.VariableNames)
-        tbl.STIM8_ON = [];
+    for v = ["emptyCnd", "STIM8_ON"]
+        if ismember(v, tbl.Properties.VariableNames)
+            tbl.(v) = [];
+        end
     end
 
     if ismember('ALIGN_PULSE', tbl.Properties.VariableNames)
-        tbl = movevars(tbl,{'ALIGN_PULSE'},'After','START_TRIAL');
+        tbl = movevars(tbl,{'ALIGN_PULSE'}, 'After','START_TRIAL');
     end
 
     if ismember('IGNORED', tbl.Properties.VariableNames) && ismember('CORRECT', tbl.Properties.VariableNames)
         tbl = movevars(tbl,{'IGNORED'},'After','CORRECT');
+    end
+
+    %% Add spiking data if nasnet was used 
+
+    % Find all variable names in tbl1 that start with 'spiketimes_'
+    spike_vars = tbl1.Properties.VariableNames(startsWith(tbl1.Properties.VariableNames, 'spiketimes_'));
+    
+    for i = 1:numel(spike_vars)
+        % Extract the numeric suffix (e.g. from 'spiketimes_3' get '3')
+        suffix = extractAfter(spike_vars{i}, 'spiketimes_');
+        
+        % Construct corresponding names for spiketimes and netlabels
+        spk_name = ['spiketimes_' suffix];
+        net_name = ['netlabels_' suffix];
+    
+        % Only copy if both variables exist
+        if ismember(net_name, tbl1.Properties.VariableNames)
+            tbl.(spk_name) = tbl1.(spk_name);
+            tbl.(net_name) = tbl1.(net_name);
+        end
+    end
+
+    if ~isempty(LFP)
+        tbl.lfp = LFP;
     end
 
 end
