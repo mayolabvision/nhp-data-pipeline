@@ -174,7 +174,7 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological
             continue
         end
             
-        if ~isempty(NET_PATH)
+        if ~isempty(NET_PATH) & isempty(SORTER_PATH)
             addpath(genpath(NET_PATH));
 
             [nev, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', true, 'netFolder', fullfile(NET_PATH,'networks'), 'READ_LFP', false);
@@ -323,13 +323,6 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological
         end
     end
 
-    % Convert structures to a cell array of string representations
-    if ~isempty(tbl)
-        merged_struct = merge_taskParams(tbl);
-        S1.(this_task).params = merged_struct;
-    end
-    S1.(this_task).hdr = out_ns5.hdr;
-
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %% Extracting sorting data from SpikeInterface outputs (e.g., kilosort)
     if SORTER_PATH
@@ -409,10 +402,16 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological
             protocolStruct = jsondecode(jsonStr);
             S1.protocol = protocolStruct;
             S1.sorting = sorting_all;
-            S1.motion_info = motion_info;
         end
 
     end
+    
+    % Convert structures to a cell array of string representations
+    if ~isempty(tbl)
+        merged_struct = merge_taskParams(tbl);
+        S1.(this_task).params = merged_struct;
+    end
+    S1.(this_task).hdr = out_ns5.hdr;
 
     S1.(this_task).dat = dat;
     S1.(this_task).tbl = tbl;
