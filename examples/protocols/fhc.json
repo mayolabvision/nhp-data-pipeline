@@ -1,0 +1,11 @@
+{
+    "preprocessing": {},
+    
+    "motion_correction": {},
+    
+    "sorting": {},
+
+    "postprocessing": {},
+
+    "quality_metrics": {} 
+}
