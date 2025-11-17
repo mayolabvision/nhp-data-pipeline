@@ -7,7 +7,7 @@ function process_fullRecording(session_name,varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Default paths to add to the MATLAB path    
 defaultRAW_PATH   =  '/Volumes/lab_NHPdata';
-defaultOUT_PATH   =  '/Volumes/home/DATA';
+defaultOUT_PATH   =  '/Volumes/SHARED_STUFF/lab_NHPdata-processed';
 defaultNEV_PATH   =   '/Users/kendranoneman/Packages/nevutils';
 defaultHELP_PATH  =  '/Users/kendranoneman/Projects/mayo/helperfunctions';
 
@@ -305,7 +305,12 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological
 
         tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
         tbl = removevars(tbl, 'time_sec');
-        tbl.spiketimes_1 = cellfun(@(x) iff(isnumeric(x), {x}, x), tbl.spiketimes_1, 'uni', 0);
+        for i = 1:height(tbl)
+            if ~iscell(tbl.spiketimes_1{i})
+                tbl.spiketimes_1{i} = {tbl.spiketimes_1{i}};   % wrap numeric (or empty) in a cell
+                tbl.netlabels_1{i} = {tbl.netlabels_1{i}};   
+            end
+        end
 
        
         [~, fname, ~] = fileparts(nevpath);   % 'kendra_scrappy_0066a_mdir1'
