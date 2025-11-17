@@ -10,6 +10,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore", category=pd.errors.SettingWithCopyWarning)
 
+from .path_utils import save_params
 from .base import RecordingProfile
 from config import RAW_DATA_PATH
 
