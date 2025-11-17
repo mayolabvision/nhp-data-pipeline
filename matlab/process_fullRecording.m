@@ -7,7 +7,7 @@ function process_fullRecording(session_name,varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Default paths to add to the MATLAB path    
 defaultRAW_PATH   =  '/Volumes/lab_NHPdata';
-defaultOUT_PATH   =  '/Volumes/home/DATA';
+defaultOUT_PATH   =  '/Volumes/SHARED_STUFF/lab_NHPdata-processed';
 defaultNEV_PATH   =   '/Users/kendranoneman/Packages/nevutils';
 defaultHELP_PATH  =  '/Users/kendranoneman/Projects/mayo/helperfunctions';
 
@@ -95,7 +95,7 @@ nevnames = nevnames(idx);
 nevpaths = raw_filepaths(idx);
 
 % Define possible task keywords
-task_keywords = {'rfmp', 'rfMapping', 'purs', 'pursuit', 'mdir', 'dirmem', 'fstm', 'cfix', 'frvw', 'oflu'};
+task_keywords = {'rfmp', 'rfMapping', 'purs', 'pursuit', 'mdir', 'dirmem', 'fstm', 'cfix', 'frvw', 'oflu', 'absp'};
 tasks = cell(size(nevnames));
 
 for i = 1:numel(nevnames)
@@ -279,33 +279,59 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological
         probe = 1;
         if nevnum==1
             sorting.probe_index = probe;
-
-            if size(chans,1) == 1
-                chans_tbl = table({metadata.sess_name}, 'VariableNames', {'sess_name'});
-            else
-                chans_tbl = table(repmat(metadata.sess_name, size(chans,1), 1), 'VariableNames', {'sess_name'});
-            end
-            chans_tbl.probe_index = repmat(probe, height(chans_tbl), 1);
-            chans_tbl.cluster_id = (1:height(chans_tbl))'-1;
-            chans_tbl.best_channel = chans(:,1);
-            chans_tbl.sort_code = chans(:,2); 
-            chans_tbl.probe_label = repmat(metadata.probe_label{probe}, height(chans_tbl), 1);
-            chans_tbl.probe_type = repmat(metadata.probe_type{probe}, height(chans_tbl), 1);
-            chans_tbl.probe_config = repmat(metadata.probe_config{probe}, height(chans_tbl), 1);
-            chans_tbl.hardware_config = repmat(metadata.hardware_config{probe}, height(chans_tbl), 1);
-            %chans_tbl.probe_depth_mm = repmat(metadata.probe_depth_mm(probe), height(chans_tbl), 1);
-            %chans_tbl.probe_gridHole = repmat(metadata.probe_gridHole(probe), height(chans_tbl), 1);
-
-            chans_tbl.sess_name = categorical(string(chans_tbl.sess_name));
-    
-            sorting.clusters = chans_tbl; 
-       
             S1.sorting = sorting;
+            chans_tbl_all = [];
+        end
+
+        out = regexp(this_task, 'unit(\d{2})', 'tokens', 'once');
+        unitNum = str2double(out{1});
+
+        if size(chans,1) == 1
+            chans_tbl = table({metadata.sess_name}, 'VariableNames', {'sess_name'});
+        else
+            chans_tbl = table(repmat(metadata.sess_name, size(chans,1), 1), 'VariableNames', {'sess_name'});
+        end
+            
+        chans_tbl.sess_name = categorical(string(chans_tbl.sess_name));
+        chans_tbl.probe_index = repmat(probe, height(chans_tbl), 1);
+        chans_tbl.unit_id = repmat(unitNum, height(chans_tbl), 1);
+        %chans_tbl.cluster_id = (1:height(chans_tbl))'-1;
+        chans_tbl.best_channel = chans(:,1);
+        chans_tbl.sort_code = chans(:,2); 
+        if unitNum <= numel(metadata.probe_depth_mm)
+            chans_tbl.probe_depth_mm = repmat(metadata.probe_depth_mm(unitNum), height(chans_tbl), 1);
+        else
+            chans_tbl.probe_depth_mm = NaN(height(chans_tbl), 1);
+        end
+        chans_tbl.probe_label = repmat(metadata.probe_label{probe}, height(chans_tbl), 1);
+        chans_tbl.probe_type = repmat(metadata.probe_type{probe}, height(chans_tbl), 1);
+        chans_tbl.probe_config = repmat(metadata.probe_config{probe}, height(chans_tbl), 1);
+        chans_tbl.hardware_config = repmat(metadata.hardware_config{probe}, height(chans_tbl), 1);
+        chans_tbl.probe_gridHole = repmat(metadata.probe_gridHole{probe}, height(chans_tbl), 1);
+
+        chans_tbl_all = [chans_tbl_all; chans_tbl];
+    
+        if nevnum==length(nevnames)
+            chans_tbl_all = unique(chans_tbl_all, 'rows');
+            chans_tbl_all.cluster_id = (1:height(chans_tbl_all))'-1;
+            chans_tbl_all = movevars(chans_tbl_all,{'cluster_id'},'After','probe_index');
+
+            chans_tbl_all.probe_label = categorical(string(chans_tbl_all.probe_label));
+            chans_tbl_all.probe_type = categorical(string(chans_tbl_all.probe_type));
+            chans_tbl_all.probe_config = categorical(string(chans_tbl_all.probe_config));
+            chans_tbl_all.hardware_config = categorical(string(chans_tbl_all.hardware_config));
+
+            S1.sorting.clusters = chans_tbl_all; 
         end
 
         tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
         tbl = removevars(tbl, 'time_sec');
-        tbl.spiketimes_1 = cellfun(@(x) iff(isnumeric(x), {x}, x), tbl.spiketimes_1, 'uni', 0);
+        for row = 1:height(tbl)
+            if ~iscell(tbl.spiketimes_1{row})
+                tbl.spiketimes_1{row} = {tbl.spiketimes_1{row}};   % wrap numeric (or empty) in a cell
+                tbl.netlabels_1{row} = {tbl.netlabels_1{row}};   
+            end
+        end
 
        
         [~, fname, ~] = fileparts(nevpath);   % 'kendra_scrappy_0066a_mdir1'
