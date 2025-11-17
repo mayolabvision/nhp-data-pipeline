@@ -18,8 +18,8 @@ global_job_kwargs = dict(n_jobs=int(int(os.environ.get("SLURM_CPUS_PER_TASK", "8
 set_global_job_kwargs(**global_job_kwargs)
 
 def plot_probe_motion(profile):
-    motion = np.load(profile.preprocess_path / 'medicine_motion.npy')
-    time_bins = np.load(profile.preprocess_path / 'medicine_time_bins.npy')
+    motion = np.load(profile.preprocess_path / 'motion.npy')
+    time_bins = np.load(profile.preprocess_path / 'time_bins.npy')
     
     time_bins = time_bins - time_bins[0]       # start time (in sec) at 0
     motion = (motion - motion[0]).squeeze()    # initial motion at 0 µm

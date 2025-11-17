@@ -79,7 +79,7 @@ class NeuropixelProfile(RecordingProfile):
             
             else:
                 print(f"--- Preprocessing data without motion correction ---")
-                if (self.preprocess_path / 'output').exists():
+                if (self.preprocess_path / 'output').exists() and (self.preprocess_path / 'motion.npy').is_file():
                     mc_recording = load(self.preprocess_path / 'output')
                 else:
                     mc_recording = run_preprocessing_without_motion_correction(raw_recording, self.protocol, self.preprocess_path)
@@ -87,7 +87,9 @@ class NeuropixelProfile(RecordingProfile):
                     print(f"✓ Preprocessed data saved: {self.preprocess_path}")
                                     
                 print(f"Estimating probe motion...........................")
-                detect_probe_motion(mc_recording, self.preprocess_path)
+                if not (self.preprocess_path / 'motion.npy').is_file():
+                    detect_probe_motion(mc_recording, self.preprocess_path)
+                
                 plot_probe_motion(self)
                 print(f"===== probe motion estimated and plotted =====")
                 
