@@ -420,7 +420,7 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological
                 for v = vars
                     col = sorting.clusters.(v{1});
                     if ischar(col) || (iscell(col) && all(cellfun(@ischar, col)))
-                        sorting.clusters.(v{1}) = categorical(col);
+                        sorting.clusters.(v{1}) = categorical(string(col));
                     end
                 end
 

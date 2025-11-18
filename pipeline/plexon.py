@@ -60,12 +60,21 @@ class PlexonProfile(RecordingProfile):
             with open(self.data_path / "ripple_info.json", "r") as f:
                 ripple_info = json.load(f)
  
+            '''
             raw_recording = read_binary(file_paths = self.data_path / f"raw_signal.bin", 
                                         sampling_frequency = ripple_info["Fs"],
                                         num_channels = ripple_info["num_channels"],
                                         dtype = ripple_info["dtype_python"],
                                         gain_to_uV = ripple_info["gain_to_uV"],
                                         offset_to_uV = ripple_info["offset_to_uV"]) 
+            '''
+            raw_recording = read_binary(file_paths=self.data_path / "raw_signal.bin",
+                                        sampling_frequency=ripple_info["Fs"],
+                                        num_channels=ripple_info["num_channels"],
+                                        dtype=ripple_info["dtype_python"],
+                                        gain_to_uV=ripple_info.get("gain_to_uV"),
+                                        offset_to_uV=ripple_info.get("offset_to_uV"))
+
             print("--------------------------------------------------")
             print("Sampling frequency:", raw_recording.get_sampling_frequency())
             print("Number of channels:", raw_recording.get_num_channels())

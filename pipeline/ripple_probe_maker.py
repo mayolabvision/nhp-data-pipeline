@@ -175,9 +175,12 @@ def get_probe(data_path,
     if not probe_path.exists():
         print(f"Probe map '{name}.json' does not exist in {probes_path}. It needs to be generated first.")
         return
+
+    prb = read_probeinterface(probe_path)
+    prb.set_global_device_channel_indices(np.arange(prb.get_contact_count()))
     
     json_path = data_path / "prbMap.json"
-    shutil.copy2(probe_path, json_path)   
+    write_probeinterface(json_path, prb)   
  
     print(f"Saved probe JSON to {json_path}")
 
