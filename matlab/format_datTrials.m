@@ -119,7 +119,7 @@ function [dat, epochEnd, tempdata, channels] = format_datTrials(nev, out_ns5, va
         digcodes = this_nev(diginnevind, :);
 
         channels = unique(NEV(NEV(:,1) ~= 0,1:2),'rows');
-        channels = channels(channels(:,1) ~= 0 & ismember(channels(:,1), neural_channels) & channels(:,2) ~= 0,:);
+        channels = channels(channels(:,1) ~= 0 & ismember(channels(:,1), neural_channels),:);
     
         % Find trial start and end indices
         trialstartindstemp = find(digcodes(:, 2) == starttrial);

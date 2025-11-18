@@ -326,12 +326,12 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological
 
         tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
         tbl = removevars(tbl, 'time_sec');
-        for row = 1:height(tbl)
-            if ~iscell(tbl.spiketimes_1{row})
-                tbl.spiketimes_1{row} = {tbl.spiketimes_1{row}};   % wrap numeric (or empty) in a cell
-                tbl.netlabels_1{row} = {tbl.netlabels_1{row}};   
-            end
-        end
+        % for row = 1:height(tbl)
+        %     if ~iscell(tbl.spiketimes_1{row})
+        %         tbl.spiketimes_1{row} = {tbl.spiketimes_1{row}};   % wrap numeric (or empty) in a cell
+        %         tbl.netlabels_1{row} = {tbl.netlabels_1{row}};   
+        %     end
+        % end
 
        
         [~, fname, ~] = fileparts(nevpath);   % 'kendra_scrappy_0066a_mdir1'
