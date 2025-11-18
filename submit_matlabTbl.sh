@@ -2,7 +2,7 @@
 #SBATCH --nodes=1
 #SBATCH --time=0-00:59:00
 #SBATCH --cluster=smp
-#SBATCH --partition=high-mem
+#SBATCH --partition=smp
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
 #SBATCH --job-name=matlab

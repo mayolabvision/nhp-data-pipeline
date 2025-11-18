@@ -1,0 +1,13 @@
+{
+  "sess_name": "experimenter_monkey_0000a",
+  "probe_label": ["lFEF"],
+  "probe_type": ["plexon"],
+  "probe_config": ["PLX-SP-24-15SE_150-210-100_640-30-540-1_CON_32m-V"],
+  "hardware_config": ["elecA"],
+  "probe_depth_mm": [0.0],
+  "probe_gridHole": [["a1","m1"]],
+
+  "HEeye_VEeye_diode_pupil": ["10241","10242","10243","10244"]
+}
+
+
