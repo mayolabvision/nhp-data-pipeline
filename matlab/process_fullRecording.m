@@ -218,7 +218,13 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological
                 chans_tbl.probe_depth_mm = repmat(metadata.probe_depth_mm(probe), height(chans_tbl), 1);
                 chans_tbl.probe_gridHole = repmat(metadata.probe_gridHole(probe), height(chans_tbl), 1);
 
-                chans_tbl.sess_name = categorical(string(chans_tbl.sess_name));
+                vars = chans_tbl.Properties.VariableNames;
+                for v = vars
+                    col = chans_tbl.(v{1});
+                    if ischar(col) || (iscell(col) && all(cellfun(@ischar, col)))
+                        chans_tbl.(v{1}) = categorical(string(col));
+                    end
+                end
 
                 sorting.clusters = chans_tbl; 
                 sorting_all = [sorting_all; sorting];
@@ -409,6 +415,14 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological
                 end
                 sorting.clusters.probe_index = repmat(probe,height(sorting.clusters),1);
                 sorting.clusters = movevars(sorting.clusters,{'probe_index'},'After','sess_name');
+
+                vars = sorting.clusters.Properties.VariableNames;
+                for v = vars
+                    col = sorting.clusters.(v{1});
+                    if ischar(col) || (iscell(col) && all(cellfun(@ischar, col)))
+                        sorting.clusters.(v{1}) = categorical(col);
+                    end
+                end
 
                 motion_path = fullfile(RAW_PATH, session_name, [session_name, '_', metadata.hardware_config{probe}], 'preprocess', preprocess_hash, pp_hash, motion_hash);
                 load(fullfile(motion_path,'motion.mat'));
