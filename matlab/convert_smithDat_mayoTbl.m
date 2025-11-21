@@ -211,6 +211,8 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
             num2cell(detect_saccades(v(:, f(1):end)) + f(1), 2), ...
             tbl.eyeVel(validRows), tbl.FIXATE(validRows), 'uni', 0);
 
+        [~,rVel] = cellfun(@(q) cart2pol(q(1,:),q(2,:)), tbl.eyeVel, 'uni', 0);
+        
         tbl.saccadeOnset = nan(height(tbl),1); tbl.saccadeOffset = nan(height(tbl),1); tbl.saccadeLatency = nan(height(tbl),1);
         for t = 1:height(tbl)
             if isequal(tbl.result(t),'CORRECT')
@@ -220,6 +222,11 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
     
                 tbl.saccadeOnset(t) = tbl.saccades{t}{m}(1);
                 tbl.saccadeOffset(t) = tbl.saccades{t}{m}(2);
+
+                eyeSac = rVel{t}(tbl.saccadeOnset(t):tbl.saccadeOnset(t)+200);
+                [~,idx] = max(eyeSac);
+                eyeSac(idx:end) = NaN;
+                tbl.saccadeOnset(t) = tbl.saccadeOnset(t)+(find(diff(eyeSac)<0,1,'last')+1);
 
                 tbl.saccadeLatency(t) = tbl.saccadeOnset(t) - tbl.FIX_OFF{t};
             end
@@ -252,9 +259,9 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
             end
         end
 
-        tbl.saccadeOffset_dTheta = dThetas;
-        tbl.saccadeOffset_dRho = dRhos;
-        tbl.saccadeOffset_dist = dists;
+        tbl.saccadeOffset_dTheta = cell2mat(dThetas);
+        tbl.saccadeOffset_dRho = cell2mat(dRhos);
+        tbl.saccadeOffset_dist = cell2mat(dists);
 
     elseif any(contains(TASK_NAME, {'purs','pursuit'}))
         % Define the columns to replace and their new names
@@ -320,6 +327,8 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
         end
         tbl.saccades = cell(height(tbl), 1);
 
+        [~,rVel] = cellfun(@(q) cart2pol(q(1,:),q(2,:)), tbl.eyeVel, 'uni', 0);
+
         % LOOP THROUGH EACH ROW OF TABLE 
         for row = 1:height(tbl)
             if ~isnan(tbl.FIXATE{row})
@@ -339,6 +348,11 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
         
                     tbl.saccadeOnset(row) = tbl.saccades{row}{m}(1);
                     tbl.saccadeOffset(row) = tbl.saccades{row}{m}(2);
+                    
+                    eyeSac = rVel{row}(tbl.saccadeOnset(row):tbl.saccadeOnset(row)+200);
+                    [~,idx] = max(eyeSac);
+                    eyeSac(idx:end) = NaN;
+                    tbl.saccadeOnset(row) = tbl.saccadeOnset(row)+(find(diff(eyeSac)<0,1,'last')+1);
     
                     tbl.saccadeLatency(row) = tbl.saccadeOnset(row) - tbl.FIX_OFF{row};
 
