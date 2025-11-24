@@ -226,7 +226,10 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
                 eyeSac = rVel{t}(tbl.saccadeOnset(t):tbl.saccadeOnset(t)+200);
                 [~,idx] = max(eyeSac);
                 eyeSac(idx:end) = NaN;
-                tbl.saccadeOnset(t) = tbl.saccadeOnset(t)+(find(diff(eyeSac)<0,1,'last')+1);
+                saccadeOnset2 = tbl.saccadeOnset(t)+(find(diff(eyeSac)<0,1,'last')+1);
+                if ~isempty(saccadeOnset2)
+                    tbl.saccadeOnset(t) = tbl.saccadeOnset(t)+(find(diff(eyeSac)<0,1,'last')+1);
+                end
 
                 tbl.saccadeLatency(t) = tbl.saccadeOnset(t) - tbl.FIX_OFF{t};
             end
@@ -238,6 +241,10 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
         for t = 1:height(tbl)
             if isequal(tbl.result(t),'CORRECT')
                 % radial position of eye at s
+                if (tbl.saccadeOffset(t) + 50) > size(tbl.eyePos{t}, 2)
+                    continue
+                end
+
                 [theta_eye, rho_eye] = cart2pol(tbl.eyePos{t}(1,tbl.saccadeOffset(t)+50),tbl.eyePos{t}(2,tbl.saccadeOffset(t)+50));
                 rho_targ = tbl.distance(t);
                 theta_targ = deg2rad(tbl.angle(t));
@@ -259,9 +266,9 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
             end
         end
 
-        tbl.saccadeOffset_dTheta = cell2mat(dThetas);
-        tbl.saccadeOffset_dRho = cell2mat(dRhos);
-        tbl.saccadeOffset_dist = cell2mat(dists);
+        tbl.saccadeOffset_dTheta = dThetas;
+        tbl.saccadeOffset_dRho = dRhos;
+        tbl.saccadeOffset_dist = dists;
 
     elseif any(contains(TASK_NAME, {'purs','pursuit'}))
         % Define the columns to replace and their new names
@@ -352,7 +359,10 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
                     eyeSac = rVel{row}(tbl.saccadeOnset(row):tbl.saccadeOnset(row)+200);
                     [~,idx] = max(eyeSac);
                     eyeSac(idx:end) = NaN;
-                    tbl.saccadeOnset(row) = tbl.saccadeOnset(row)+(find(diff(eyeSac)<0,1,'last')+1);
+                    saccadeOnset2 = tbl.saccadeOnset(row)+(find(diff(eyeSac)<0,1,'last')+1);
+                    if ~isempty(saccadeOnset2)
+                        tbl.saccadeOnset(row) = tbl.saccadeOnset(row)+(find(diff(eyeSac)<0,1,'last')+1);
+                    end
     
                     tbl.saccadeLatency(row) = tbl.saccadeOnset(row) - tbl.FIX_OFF{row};
 
