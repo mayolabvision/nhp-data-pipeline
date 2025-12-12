@@ -211,6 +211,8 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
             num2cell(detect_saccades(v(:, f(1):end)) + f(1), 2), ...
             tbl.eyeVel(validRows), tbl.FIXATE(validRows), 'uni', 0);
 
+        [~,rVel] = cellfun(@(q) cart2pol(q(1,:),q(2,:)), tbl.eyeVel, 'uni', 0);
+        
         tbl.saccadeOnset = nan(height(tbl),1); tbl.saccadeOffset = nan(height(tbl),1); tbl.saccadeLatency = nan(height(tbl),1);
         for t = 1:height(tbl)
             if isequal(tbl.result(t),'CORRECT')
@@ -220,6 +222,14 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
     
                 tbl.saccadeOnset(t) = tbl.saccades{t}{m}(1);
                 tbl.saccadeOffset(t) = tbl.saccades{t}{m}(2);
+
+                eyeSac = rVel{t}(tbl.saccadeOnset(t):tbl.saccadeOnset(t)+200);
+                [~,idx] = max(eyeSac);
+                eyeSac(idx:end) = NaN;
+                saccadeOnset2 = tbl.saccadeOnset(t)+(find(diff(eyeSac)<0,1,'last')+1);
+                if ~isempty(saccadeOnset2)
+                    tbl.saccadeOnset(t) = tbl.saccadeOnset(t)+(find(diff(eyeSac)<0,1,'last')+1);
+                end
 
                 tbl.saccadeLatency(t) = tbl.saccadeOnset(t) - tbl.FIX_OFF{t};
             end
@@ -231,6 +241,10 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
         for t = 1:height(tbl)
             if isequal(tbl.result(t),'CORRECT')
                 % radial position of eye at s
+                if (tbl.saccadeOffset(t) + 50) > size(tbl.eyePos{t}, 2)
+                    continue
+                end
+
                 [theta_eye, rho_eye] = cart2pol(tbl.eyePos{t}(1,tbl.saccadeOffset(t)+50),tbl.eyePos{t}(2,tbl.saccadeOffset(t)+50));
                 rho_targ = tbl.distance(t);
                 theta_targ = deg2rad(tbl.angle(t));
@@ -320,6 +334,8 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
         end
         tbl.saccades = cell(height(tbl), 1);
 
+        [~,rVel] = cellfun(@(q) cart2pol(q(1,:),q(2,:)), tbl.eyeVel, 'uni', 0);
+
         % LOOP THROUGH EACH ROW OF TABLE 
         for row = 1:height(tbl)
             if ~isnan(tbl.FIXATE{row})
@@ -339,6 +355,14 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
         
                     tbl.saccadeOnset(row) = tbl.saccades{row}{m}(1);
                     tbl.saccadeOffset(row) = tbl.saccades{row}{m}(2);
+                    
+                    eyeSac = rVel{row}(tbl.saccadeOnset(row):tbl.saccadeOnset(row)+200);
+                    [~,idx] = max(eyeSac);
+                    eyeSac(idx:end) = NaN;
+                    saccadeOnset2 = tbl.saccadeOnset(row)+(find(diff(eyeSac)<0,1,'last')+1);
+                    if ~isempty(saccadeOnset2)
+                        tbl.saccadeOnset(row) = tbl.saccadeOnset(row)+(find(diff(eyeSac)<0,1,'last')+1);
+                    end
     
                     tbl.saccadeLatency(row) = tbl.saccadeOnset(row) - tbl.FIX_OFF{row};
 
