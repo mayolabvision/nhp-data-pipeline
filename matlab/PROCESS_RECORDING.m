@@ -1,4 +1,4 @@
-function process_fullRecording(session_name,varargin)
+function PROCESS_RECORDING(session_name,varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % session_name = 'kendra_scrappy_0136a_g0' 
 % session_name is the name of a datafolder, which contains ripple data
@@ -31,63 +31,43 @@ HELPERS_PATH   =  p.Results.HELPERS_PATH;
 SORTER_PATH    =  p.Results.SORTER_PATH;
 BEHAV_ONLY     =  p.Results.BEHAVIOR_ONLY;
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+fprintf('\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
+
 addpath(genpath(NEV_PATH));
 addpath(fullfile(HELPERS_PATH,'behavior'));
-
-if BEHAV_ONLY
-    NET_PATH = [];
-    SORTER_PATH = [];
-end
-
-if isequal(SORTER_PATH, 'None')
-    SORTER_PATH = [];
-end
-
-% Get the directory of the current script or function
 currentDir = fileparts(mfilename('fullpath'));
 parentDirOneLevelUp = fileparts(currentDir);
 addpath(genpath(parentDirOneLevelUp));
-fprintf('\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if ~exist(fullfile(OUT_PATH, session_name), 'dir'), mkdir(fullfile(OUT_PATH, session_name)); end
 
 session_path = fullfile(RAW_PATH, session_name);
 filePattern = fullfile(RAW_PATH, session_name, '*.ns5');
 
 S1 = struct();
+[metadata, eye_chan_labels, diode_chan_label, pupil_chan_label] = parse_sessionMetadata(session_path);
+S1.sess_name = metadata.sess_name;
+S1.metadata = metadata;
 
-if isfile(fullfile(session_path,'metadata.json'))
-    metadata = loadMetadataJSON(fullfile(session_path,'metadata.json'));
-
-    eye_chan_labels = metadata.HEeye_VEeye_diode_pupil(1:2)';
-    diode_chan_label = metadata.HEeye_VEeye_diode_pupil{3};
-    pupil_chan_label = metadata.HEeye_VEeye_diode_pupil{4};
-
-    S1.sess_name = metadata.sess_name;
-    S1.metadata = metadata;
-
-    if BEHAV_ONLY
-        NET_PATH = [];
-        SORTER_PATH = [];
-
-        metadata.probe_type = 'behavior';
-    end
-else
+if BEHAV_ONLY
+    NET_PATH = [];
+    SORTER_PATH = [];
     metadata.probe_type = 'behavior';
-
-    eye_chan_labels = {'10241','10242'};
-    diode_chan_label = '10243';
-    pupil_chan_label = '10244';
-
-    S1.sess_name = session_name;
 end
+
+if isequal(SORTER_PATH, 'None')
+    SORTER_PATH = [];
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Parsing and ordering tasks in chronological order
 
 % Create the search pattern to find files that start with 'filename' and end with '.ns5'
 raw_files = dir(filePattern);
 raw_filenames = {raw_files.name}.';
 nevnames = cellfun(@(q) q(1:end-4), raw_filenames, 'uni', 0);
-raw_filepaths = arrayfun(@(x) fullfile(x.folder, x.name), raw_files, 'UniformOutput', false);
+raw_filepaths = arrayfun(@(x) fullfile(x.folder, x.name), raw_files, 'uni', 0);
 
 recording_times = cellfun(@(l) l.hdr.timeOrigin, cellfun(@(q) read_nsx(q,'readdata',false), raw_filepaths, 'uni', 0), 'uni', 0);
 [~,idx] = sort(recording_times);
@@ -95,14 +75,14 @@ nevnames = nevnames(idx);
 nevpaths = raw_filepaths(idx);
 
 % Define possible task keywords
-task_keywords = {'rfmp', 'rfMapping', 'purs', 'pursuit', 'mdir', 'dirmem', 'fstm', 'cfix', 'frvw', 'oflu', 'absp'};
-tasks = cell(size(nevnames));
+task_keywords = handle_taskSpecifics();
 
+tasks = cell(size(nevnames));
 for i = 1:numel(nevnames)
     name = nevnames{i};
     found = false;
     for j = 1:numel(task_keywords)
-        pattern = [task_keywords{j}, '\w*'];  % keyword followed by letters/numbers
+        pattern = [task_keywords{j}, '\w*']; 
         match = regexp(name, pattern, 'match', 'once');
         if ~isempty(match)
             tasks{i} = match;
@@ -114,7 +94,6 @@ for i = 1:numel(nevnames)
         tasks{i} = 'unknown';
     end
 end
-
 taskTypes = unique(cellfun(@(q) regexp(q, '[a-zA-Z]+', 'match', 'once'), tasks, 'uni', 0));
 disp(tasks)
 
@@ -125,7 +104,7 @@ tic
 goodFlag = true;
 prev_tempdata = struct([]);
 rip_time_start = 0;
-for nevnum = 1:length(nevnames) % loop through nev files, in chronological
+for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
     nevpath = nevpaths{nevnum};
     this_task = tasks{nevnum};
 
@@ -162,161 +141,162 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological
             these_alignTimes = alignTimes(np_mask);
             if sum(np_mask) < length(ripple_mask)
                 dat = dat(ripple_mask);
-                %fprintf('\n dat NOW has %d rows', numel(dat))
             end
         end 
 
         tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
-
+    
     %------------------------------------- PLEXON -------------------------------------%
     elseif ismember('plexon',metadata.probe_type)
-        if contains(this_task, 'fstm')
-            continue
-        end
-            
-        if ~isempty(NET_PATH) & isempty(SORTER_PATH)
-            addpath(genpath(NET_PATH));
+        if any(contains(this_task, {'fstm', 'fast'}))
+            [nev, out_ns5, ~] = extract_nevout(nevpath);
+            if ~isempty(nev)
+                [dat, ~, tempdata, ~] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ... 
+                                        'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
+                prev_tempdata = tempdata;
+                tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
+                tbl = removevars(tbl, 'time_sec');
+            end
+        else
+            if ~isempty(NET_PATH) & isempty(SORTER_PATH)
+                addpath(genpath(NET_PATH));
 
-            [nev, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', true, 'netFolder', fullfile(NET_PATH,'networks'), 'READ_LFP', false);
+                [nev, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', true, 'netFolder', fullfile(NET_PATH,'networks'), 'READ_LFP', false);
 
-            [dat, ~, tempdata, ~] = format_datTrials(nev, out_ns5, 'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
-            prev_tempdata = tempdata;
+                [dat, ~, tempdata, ~] = format_datTrials(nev, out_ns5, 'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
 
-            sorting_all = [];
-            for probe = 1:numel(metadata.hardware_config)
-                sorting.probe_index = probe;
-                if isequal(metadata.hardware_config{probe},"elecA")
-                    neural_chans = 1:128;
-                elseif isequal(metadata.hardware_config{probe},"elecB")
-                    neural_chans = 129:256;
-                elseif isequal(metadata.hardware_config{probe},"elecC")
-                    neural_chans = 257:384;
-                elseif isequal(metadata.hardware_config{probe},"elecD")
-                    neural_chans = 385:513;
-                end
-    
-                % if exist([nevpath,'.ns2'], 'file') == 2
-                %     [nev, out_ns5, out_ns2] = extract_nevout(nevpath, 'SPIKE_SORT', true, 'netFolder', fullfile(NET_PATH,'networks'), 'READ_LFP', true);
-                %     %lfp = extract_lfpData(nev,out_ns2,mappings.ripChan_num); 
-                % 
-                %     [dat, ~] = format_datTrials(nev, out_ns5, 'NEURAL_CHANNELS', mappings.ripChan_num, 'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
-                %     tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task, 'LFP', lfp);
-                
-                [dat2, ~, ~, chans] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ...
-                                'NEURAL_CHANNELS', neural_chans, 'PROBE_INDEX', probe, ...
-                                'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
-                
-                chans_tbl = table(repmat(metadata.sess_name, size(chans,1), 1), 'VariableNames', {'sess_name'});
-                chans_tbl.probe_index = repmat(probe, height(chans_tbl), 1);
-                chans_tbl.cluster_id = (1:height(chans_tbl))'-1;
-                chans_tbl.best_channel = chans(:,1);
-                chans_tbl.sort_code = chans(:,2); 
-                chans_tbl.probe_label = repmat(metadata.probe_label{probe}, height(chans_tbl), 1);
-                chans_tbl.probe_type = repmat(metadata.probe_type{probe}, height(chans_tbl), 1);
-                chans_tbl.probe_config = repmat(metadata.probe_config{probe}, height(chans_tbl), 1);
-                chans_tbl.hardware_config = repmat(metadata.hardware_config{probe}, height(chans_tbl), 1);
-                chans_tbl.probe_depth_mm = repmat(metadata.probe_depth_mm(probe), height(chans_tbl), 1);
-                chans_tbl.probe_gridHole = repmat(metadata.probe_gridHole(probe), height(chans_tbl), 1);
+                sorting_all = [];
+                for probe = 1:numel(metadata.hardware_config)
+                    sorting.probe_index = probe;
+                    if isequal(metadata.hardware_config{probe},"elecA")
+                        neural_chans = 1:128;
+                    elseif isequal(metadata.hardware_config{probe},"elecB")
+                        neural_chans = 129:256;
+                    elseif isequal(metadata.hardware_config{probe},"elecC")
+                        neural_chans = 257:384;
+                    elseif isequal(metadata.hardware_config{probe},"elecD")
+                        neural_chans = 385:513;
+                    end
+        
+                    [dat2, ~, ~, chans] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ...
+                                    'NEURAL_CHANNELS', neural_chans, 'PROBE_INDEX', probe, ...
+                                    'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
+                    
+                    chans_tbl = table(repmat(metadata.sess_name, size(chans,1), 1), 'VariableNames', {'sess_name'});
+                    chans_tbl.probe_index = repmat(probe, height(chans_tbl), 1);
+                    chans_tbl.cluster_id = (1:height(chans_tbl))'-1;
+                    chans_tbl.best_channel = chans(:,1);
+                    chans_tbl.sort_code = chans(:,2); 
+                    chans_tbl.probe_label = repmat(metadata.probe_label{probe}, height(chans_tbl), 1);
+                    chans_tbl.probe_type = repmat(metadata.probe_type{probe}, height(chans_tbl), 1);
+                    chans_tbl.probe_config = repmat(metadata.probe_config{probe}, height(chans_tbl), 1);
+                    chans_tbl.hardware_config = repmat(metadata.hardware_config{probe}, height(chans_tbl), 1);
+                    chans_tbl.probe_depth_mm = repmat(metadata.probe_depth_mm(probe), height(chans_tbl), 1);
+                    chans_tbl.probe_gridHole = repmat(metadata.probe_gridHole(probe), height(chans_tbl), 1);
 
-                vars = chans_tbl.Properties.VariableNames;
-                for v = vars
-                    col = chans_tbl.(v{1});
-                    if ischar(col) || (iscell(col) && all(cellfun(@ischar, col)))
-                        chans_tbl.(v{1}) = categorical(string(col));
+                    vars = chans_tbl.Properties.VariableNames;
+                    for v = vars
+                        col = chans_tbl.(v{1});
+                        if ischar(col) || (iscell(col) && all(cellfun(@ischar, col)))
+                            chans_tbl.(v{1}) = categorical(string(col));
+                        end
+                    end
+
+                    sorting.clusters = chans_tbl; 
+                    sorting_all = [sorting_all; sorting];
+
+                    fieldsToCopy = {sprintf('spiketimes_%d', probe), sprintf('netlabels_%d', probe)};
+                    for f = fieldsToCopy
+                        [dat.(f{1})] = deal(dat2.(f{1}));
                     end
                 end
 
-                sorting.clusters = chans_tbl; 
-                sorting_all = [sorting_all; sorting];
-
-                fieldsToCopy = {sprintf('spiketimes_%d', probe), sprintf('netlabels_%d', probe)};
-                for f = fieldsToCopy
-                    [dat.(f{1})] = deal(dat2.(f{1}));
+                if nevnum==1
+                    S1.sorting = sorting_all;
                 end
-            end
+                
+                prev_tempdata = tempdata;
+                tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
+                tbl = removevars(tbl, 'time_sec');
+            else
+                [nev, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', false);
 
-            if nevnum==1
-                S1.sorting = sorting_all;
-            end
+                [dat, ~, tempdata, ~] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ...
+                                'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
 
-            tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
-            tbl = removevars(tbl, 'time_sec');
-
-        else
-            [nev, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', false);
-
-            [dat, ~, tempdata, ~] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ...
-                            'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
-
-            prev_tempdata = tempdata;
-            tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
-            tbl.time_sec = tbl.time_sec+rip_time_start;
-
-            rip_time_start = rip_time_start + double(out_ns5.hdr.nSamples/out_ns5.hdr.Fs);
-
-        end
-
+                prev_tempdata = tempdata;
+                tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
+                tbl.time_sec = tbl.time_sec+rip_time_start;
+                rip_time_start = rip_time_start + double(out_ns5.hdr.nSamples/out_ns5.hdr.Fs);
+           end     
+        end    
     %------------------------------------- FHC SINGLE ELECTRODE -------------------------------------%
     elseif ismember('fhc',metadata.probe_type)
-        addpath(genpath(NET_PATH));
-
-        [nev, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', true, 'netFolder', fullfile(NET_PATH,'networks'));
-
-        hw_config = metadata.hardware_config{1};
-        parts = strsplit(hw_config, '_');
-        this_hw = parts{1};
-        this_chan = str2double(parts{2});
-
-        if isequal(this_hw,"elecA")
-            neural_chan = this_chan;
-        elseif isequal(this_hw,"elecB")
-            neural_chan = this_chan+128;
-        elseif isequal(this_hw,"elecC")
-            neural_chan = this_chan+256;
-        elseif isequal(this_hw,"elecD")
-            neural_chan = this_chan+384;
-        end 
-
-        [dat, ~, tempdata, chans] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ...
-                                              'NEURAL_CHANNELS', neural_chan, 'EYE_CHAN_LABELS', eye_chan_labels, ...
-                                              'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
-        prev_tempdata = tempdata;
-
-        probe = 1;
-        if nevnum==1
-            sorting.probe_index = probe;
-            S1.sorting = sorting;
-            chans_tbl_all = [];
-        end
-
-        out = regexp(this_task, 'unit(\d{2})', 'tokens', 'once');
-        unitNum = str2double(out{1});
-
-        if size(chans,1) == 1
-            chans_tbl = table({metadata.sess_name}, 'VariableNames', {'sess_name'});
+        if any(contains(this_task, {'fstm', 'fast'}))
+            [nev, out_ns5, ~] = extract_nevout(nevpath);
+            if ~isempty(nev)
+                [dat, ~, tempdata, ~] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ... 
+                                        'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
+            end
         else
-            chans_tbl = table(repmat(metadata.sess_name, size(chans,1), 1), 'VariableNames', {'sess_name'});
-        end
-            
-        chans_tbl.sess_name = categorical(string(chans_tbl.sess_name));
-        chans_tbl.probe_index = repmat(probe, height(chans_tbl), 1);
-        chans_tbl.unit_id = repmat(unitNum, height(chans_tbl), 1);
-        %chans_tbl.cluster_id = (1:height(chans_tbl))'-1;
-        chans_tbl.best_channel = chans(:,1);
-        chans_tbl.sort_code = chans(:,2); 
-        if unitNum <= numel(metadata.probe_depth_mm)
-            chans_tbl.probe_depth_mm = repmat(metadata.probe_depth_mm(unitNum), height(chans_tbl), 1);
-        else
-            chans_tbl.probe_depth_mm = NaN(height(chans_tbl), 1);
-        end
-        chans_tbl.probe_label = repmat(metadata.probe_label{probe}, height(chans_tbl), 1);
-        chans_tbl.probe_type = repmat(metadata.probe_type{probe}, height(chans_tbl), 1);
-        chans_tbl.probe_config = repmat(metadata.probe_config{probe}, height(chans_tbl), 1);
-        chans_tbl.hardware_config = repmat(metadata.hardware_config{probe}, height(chans_tbl), 1);
-        chans_tbl.probe_gridHole = repmat(metadata.probe_gridHole{probe}, height(chans_tbl), 1);
+            addpath(genpath(NET_PATH));
 
-        chans_tbl_all = [chans_tbl_all; chans_tbl];
-    
+            [nev, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', true, 'netFolder', fullfile(NET_PATH,'networks'));
+
+            hw_config = metadata.hardware_config{1};
+            parts = strsplit(hw_config, '_');
+            this_hw = parts{1};
+            this_chan = str2double(parts{2});
+
+            if isequal(this_hw,"elecA")
+                neural_chan = this_chan;
+            elseif isequal(this_hw,"elecB")
+                neural_chan = this_chan+128;
+            elseif isequal(this_hw,"elecC")
+                neural_chan = this_chan+256;
+            elseif isequal(this_hw,"elecD")
+                neural_chan = this_chan+384;
+            end 
+
+            [dat, ~, tempdata, chans] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ...
+                                                  'NEURAL_CHANNELS', neural_chan, 'EYE_CHAN_LABELS', eye_chan_labels, ...
+                                                  'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
+            probe = 1;
+            if nevnum==1
+                sorting.probe_index = probe;
+                S1.sorting = sorting;
+                chans_tbl_all = [];
+            end
+
+            out = regexp(this_task, 'unit(\d{2})', 'tokens', 'once');
+            unitNum = str2double(out{1});
+
+            if size(chans,1) == 1
+                chans_tbl = table({metadata.sess_name}, 'VariableNames', {'sess_name'});
+            else
+                chans_tbl = table(repmat(metadata.sess_name, size(chans,1), 1), 'VariableNames', {'sess_name'});
+            end
+                
+            chans_tbl.sess_name = categorical(string(chans_tbl.sess_name));
+            chans_tbl.probe_index = repmat(probe, height(chans_tbl), 1);
+            chans_tbl.unit_id = repmat(unitNum, height(chans_tbl), 1);
+            chans_tbl.best_channel = chans(:,1);
+            chans_tbl.sort_code = chans(:,2); 
+            if unitNum <= numel(metadata.probe_depth_mm)
+                chans_tbl.probe_depth_mm = repmat(metadata.probe_depth_mm(unitNum), height(chans_tbl), 1);
+            else
+                chans_tbl.probe_depth_mm = NaN(height(chans_tbl), 1);
+            end
+            chans_tbl.probe_label = repmat(metadata.probe_label{probe}, height(chans_tbl), 1);
+            chans_tbl.probe_type = repmat(metadata.probe_type{probe}, height(chans_tbl), 1);
+            chans_tbl.probe_config = repmat(metadata.probe_config{probe}, height(chans_tbl), 1);
+            chans_tbl.hardware_config = repmat(metadata.hardware_config{probe}, height(chans_tbl), 1);
+            chans_tbl.probe_gridHole = repmat(metadata.probe_gridHole{probe}, height(chans_tbl), 1);
+
+            chans_tbl_all = [chans_tbl_all; chans_tbl];
+
+        end   
+ 
         if nevnum==length(nevnames)
             chans_tbl_all = unique(chans_tbl_all, 'rows');
             chans_tbl_all.cluster_id = (1:height(chans_tbl_all))'-1;
@@ -330,19 +310,13 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological
             S1.sorting.clusters = chans_tbl_all; 
         end
 
-        tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
-        tbl = removevars(tbl, 'time_sec');
-        % for row = 1:height(tbl)
-        %     if ~iscell(tbl.spiketimes_1{row})
-        %         tbl.spiketimes_1{row} = {tbl.spiketimes_1{row}};   % wrap numeric (or empty) in a cell
-        %         tbl.netlabels_1{row} = {tbl.netlabels_1{row}};   
-        %     end
-        % end
-
-       
+        prev_tempdata = tempdata;
         [~, fname, ~] = fileparts(nevpath);   % 'kendra_scrappy_0066a_mdir1'
         this_task = erase(fname, session_name); % 'a_mdir1'
-
+        
+        tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
+        tbl = removevars(tbl, 'time_sec');
+    
     %------------------------------------- BEHAVIOR ONLY -------------------------------------%
     else 
         [nev, out_ns5, ~] = extract_nevout(nevpath);
@@ -388,7 +362,6 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological
 
                 % Pull out SpikeInterface sorting outputs
                 [spikes_perTrial,sorting,~] = parse_SortingToTbl(tbl, fullfile(si_path,'sorter_output'), 'NP_ALIGN_PULSES', these_alignTimes, 'Fs', ap_meta.imSampRate);
-
             end
 
             tbl.(sprintf('spiketimes_%d',probe)) = spikes_perTrial;  
@@ -478,4 +451,5 @@ tc = toc;
 fprintf('\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
 fprintf(sprintf('Total elapsed time was %2.2f minutes',tc/60))
 fprintf('\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
+
 end

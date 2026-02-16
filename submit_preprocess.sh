@@ -9,7 +9,7 @@
 #SBATCH --error=/ix1/pmayo/outfiles/out_%A_%a.out
 #SBATCH --output=/ix1/pmayo/outfiles/out_%A_%a.out
 #SBATCH --mail-type=done,fail
-#SBATCH --mail-user=knoneman@pitt.edu
+#SBATCH --mail-user=mayolab@pitt.edu
 #SBATCH --array=0-1
 
 # ----- Load environment -----
@@ -54,7 +54,7 @@ sleep 5
 echo "=================================================="
 
 #################################################################
-##################### RUN SI (PP + Sort) ########################
+##################### RUN SORTING ########################
 
 echo "Running preprocessing pipeline........................"
 $CONDA_PREFIX/bin/python -c "

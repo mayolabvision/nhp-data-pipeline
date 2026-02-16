@@ -52,7 +52,7 @@ nevnames = nevnames(idx);
 nevpaths = raw_filepaths(idx);
 
 % Define possible task keywords
-task_keywords = {'rfmp', 'rfMapping', 'purs', 'pursuit', 'mdir', 'dirmem', 'fstm', 'cfix'};
+[task_keywords,~] = handle_taskSpecifics(); 
 
 % Initialize cell array for tasks
 tasks = cell(size(nevnames));
@@ -75,12 +75,12 @@ for i = 1:numel(nevnames)
     end
 end
 
-ns5_tasks = cell(sum(cellfun(@(q) ~contains(q,'fstm'), nevnames, 'uni', 1)),1);
+ns5_tasks = cell(sum(cellfun(@(q) ~any(contains(q,{'fstm','fast'})), nevnames, 'uni', 1)),1);
 for nevnum = 1:length(nevnames)
     nevpath = nevpaths{nevnum};
     this_task = tasks{nevnum};
 
-    if ~contains(this_task,'fstm')
+    if ~any(contains(this_task,{'fstm','fast'}))
         fprintf('\n---- loading raw signal for %s ----\n', this_task);
         %[~, out_ns5, ~] = extract_nevout(nevpath, 'KEEP_INT', true);
         [~, out_ns5, ~] = extract_nevout(nevpath, 'KEEP_INT', false);

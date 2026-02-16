@@ -1,6 +1,6 @@
 #!/bin/bash -l
 #SBATCH --nodes=1
-#SBATCH --time=0-02:59:00
+#SBATCH --time=0-04:59:00
 #SBATCH --cluster=smp
 #SBATCH --partition=high-mem
 #SBATCH --ntasks-per-node=1
@@ -9,7 +9,7 @@
 #SBATCH --error=/ix1/pmayo/outfiles/out_%A.out
 #SBATCH --output=/ix1/pmayo/outfiles/out_%A.out
 #SBATCH --mail-type=done,fail
-#SBATCH --mail-user=knoneman@pitt.edu
+#SBATCH --mail-user=mayolab@pitt.edu
 
 # ----- Load environment -----
 module purge
@@ -58,8 +58,8 @@ HELP_PATH=$(python -c "import config; print(config.HELPERS_PATH)")
 echo "Running matlab pipeline........................"
 matlab -nodisplay <<EOF
 addpath(genpath('matlab'));   % add the subdirectory to path
-fprintf('Running process_fullRecording for $1\n');
-process_fullRecording('${SESSION}', ...
+fprintf('Running process_recording for $1\n');
+PROCESS_RECORDING('${SESSION}', ...
     'RAW_DATA_PATH', '$RAW_PATH', ...
     'OUT_DATA_PATH', '$OUT_PATH', ...
     'NEVUTIL_PATH', '$NEV_PATH', ... 
@@ -68,25 +68,6 @@ process_fullRecording('${SESSION}', ...
     'SORTER_PATH', '$SORTER_PATH');
 exit
 EOF
-
-#################################################################
-#HELPERS_PATH=$(python -c "import config; print(config.HELPERS_PATH)")
-#
-#TBL_PATH="${OUT_DATA_PATH}/${SESSION}/tables/${SESSION}-${SORTER_PATH}.mat"
-#echo "TBL_PATH    =  '$TBL_PATH'"
-#echo "======================================================"
-#
-#echo "Running extra matlab fxns........................"
-#matlab -nodisplay <<EOF
-#addpath(genpath('matlab'));
-#addpath(genpath('${HELPERS_PATH}/behavior'));
-#addpath(genpath('${HELPERS_PATH}/utils'));
-#addpath(genpath('${HELPERS_PATH}/neurons'));
-#fprintf('Running addToTbl_KKN for $1\n');
-#addToTbl_KKN('${TBL_PATH}', ...
-#    'SAVE_NAME', '${PROTOCOL}');
-#exit
-#EOF
 
 #################################################################
 echo "DONE"
