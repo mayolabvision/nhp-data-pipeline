@@ -31,7 +31,7 @@ HELPERS_PATH=$(python -c "import config; print(config.HELPERS_PATH)")
 echo "======================================================"
 
 SESSION="${1}"
-PROTOCOL="${2:-np-nodrift-ks4_wr12}"
+PROTOCOL="${2:-np-ks4}"
 PROBE_ID="${3:-1}"
 
 echo "SESSION    =  $SESSION"

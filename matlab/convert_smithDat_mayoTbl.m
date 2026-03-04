@@ -119,11 +119,11 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
     tbl.params = tbl1.params;
     tbl.eyedata = tbl1.eyedata; tbl.pupil = tbl1.pupil; tbl.diode = tbl1.diode;
 
-    try
-        [~, tbl] = handle_taskSpecifics(tbl, TASK_NAME);
-    catch
-        disp('task specific editions did not work');
-    end
+    %try
+    [~, tbl] = handle_taskSpecifics(tbl, TASK_NAME);
+    %catch
+    %disp('task specific editions did not work');
+    %end
 
     %tbl.ns5_samps = tbl1.ns5_samps;
 

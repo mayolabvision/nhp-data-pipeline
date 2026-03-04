@@ -27,6 +27,8 @@ tbl = in_tbl;
 eyePos = cellfun(@(x) filterEyeTraces_EyeLink(x), tbl.eyedata, 'uni', 0);
 [eyeVel, eyeAcc] = cellfun(@(x) calcDerivative_eyeTraces(x), eyePos, 'uni', 0);
 
+if ismember('FIXATE', tbl.Properties.VariableNames) && ~iscell(tbl.FIXATE), tbl.FIXATE = num2cell(tbl.FIXATE); end
+
 %---------------------------------------- rfMapping_dots ----------------------------------------% 
 if any(contains(taskName, {'rfmp', 'rfMapping'}))
     process_string = @(input_str) [...
@@ -143,7 +145,7 @@ elseif any(contains(taskName, {'purs', 'pursuit'}))
     tbl = expandConditionText(tbl);
     tbl.eyePos = eyePos; tbl.eyeVel = eyeVel; tbl.eyeAcc = eyeAcc;
     
-    tbl.result(tbl.result==0 | tbl.result==154) = 167;
+    %tbl.result(tbl.result==0 | tbl.result==154) = 167;
 
     % Define the columns to replace and their new names
     cols_to_replace = {'TARG_ON', 'PURSUIT_TARG', 'TARG_OFF', 'pursuitSpeed'};
