@@ -97,8 +97,11 @@ for nevnum = 1:length(nevnames)
                 these_chans = this_prb.chanMap+384;
             end
 
+            % Trellis channel labels
+            chan_inds = flipud(find(ismember(out_ns5.hdr.label, string(these_chans))==1));
+
             % Channels x samples
-            this_ns5 = out_ns5.data(ismember(out_ns5.hdr.label, string(these_chans)),:);
+            this_ns5 = out_ns5.data(chan_inds,:);
 
             % Save each task as samples x channels 
             ns5_tasks{nevnum} = this_ns5';
