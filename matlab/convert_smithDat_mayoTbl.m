@@ -81,8 +81,8 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
     % re-arranging table to be easier to access data 
     tbl.trialName = cellfun(@(q) [TASK_NAME, '.', sprintf('%04d', q)], num2cell(1:height(tbl1))', 'uni', 0);
     tbl.trialName = categorical(string(tbl.trialName));
-    tbl.block = tbl1.block;
-    tbl.time_sec = tbl1.time;
+    if ismember('block', tbl1.Properties.VariableNames), tbl.block = tbl1.block; end
+    if ismember('time', tbl1.Properties.VariableNames), tbl.time_sec = tbl1.time; end
 
     if iscell(tbl1.result)
         tbl.result = convertBetween_eventCodes_eventNames(tbl1.result);
@@ -119,11 +119,11 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
     tbl.params = tbl1.params;
     tbl.eyedata = tbl1.eyedata; tbl.pupil = tbl1.pupil; tbl.diode = tbl1.diode;
 
-    %try
-    [~, tbl] = handle_taskSpecifics(tbl, TASK_NAME);
-    %catch
-    %disp('task specific editions did not work');
-    %end
+    try
+        [~, tbl] = handle_taskSpecifics(tbl, TASK_NAME);
+    catch
+        disp('------------- task-specific additions failed -------------');
+    end
 
     %tbl.ns5_samps = tbl1.ns5_samps;
 

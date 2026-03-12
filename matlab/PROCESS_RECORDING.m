@@ -101,9 +101,8 @@ disp(tasks)
 %% Extracting Ripple data from nev/ns5 datafiles 
 tic
 
-goodFlag = true;
+rip_time_start = 0; goodFlag = true;
 prev_tempdata = struct([]);
-rip_time_start = 0;
 for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
     nevpath = nevpaths{nevnum};
     this_task = tasks{nevnum};
