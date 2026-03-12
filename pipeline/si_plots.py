@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
+from scipy.ndimage import gaussian_filter1d
 
 from spikeinterface.core import set_global_job_kwargs, BaseRecording
 from spikeinterface.extractors import get_neo_streams, read_spikeglx
@@ -18,15 +19,19 @@ global_job_kwargs = dict(n_jobs=int(int(os.environ.get("SLURM_CPUS_PER_TASK", "8
 set_global_job_kwargs(**global_job_kwargs)
 
 def plot_probe_motion(profile):
-    motion = np.load(profile.preprocess_path / 'motion.npy')
-    time_bins = np.load(profile.preprocess_path / 'time_bins.npy')
+    motion = np.load((profile.preprocess_path).parent.parent / 'crop_motion.npy')
+    time_bins = np.load((profile.preprocess_path).parent.parent / 'crop_time_bins.npy')
     
-    time_bins = time_bins - time_bins[0]       # start time (in sec) at 0
-    motion = (motion - motion[0]).squeeze()    # initial motion at 0 µm
+    motion_s = gaussian_filter1d(motion, sigma=50)
 
     fig, (ax1) = plt.subplots(1, 1, figsize=(15, 4))
 
     ax1.plot(time_bins, motion, color="black", linewidth=2)
+    ax1.plot(time_bins, motion_s, color="red", linewidth=2)
+ 
+    ax1.axvline(0, linestyle='--')
+    if profile.crop_endSec is not None:
+        ax1.axvline(profile.crop_endSec, linestyle='--')
 
     ax1.set_xlabel("Time [sec]")
     ax1.set_ylabel("Motion [$\\mu$m]")
@@ -36,10 +41,11 @@ def plot_probe_motion(profile):
     fig.text(0.5, 0.88, f"{profile.metadata['hardware_config'][profile.probe_id]}, {profile.metadata['probe_config'][profile.probe_id]}: depth = {profile.metadata['probe_depth_mm'][profile.probe_id]}mm, grid hole = {profile.metadata['probe_gridHole'][profile.probe_id]}", ha='center', fontsize=12)
     
     plt.tight_layout(rect=[0.05, 0.05, 1, 0.97])  # leave space for labels
-    fig.savefig(Path(profile.figs_path) / "probe_motion.png", dpi=300, bbox_inches="tight")
+    fig.savefig(Path(profile.figs_path) / "crop_probe_motion.png", dpi=300, bbox_inches="tight")
 
 def plot_preprocessing_steps(raw_recording, profile):
     # collect preprocessing steps
+    profile.protocol["preprocessing"].pop("motion_crop", None)
     pp_steps = list(profile.protocol['preprocessing'].items())
 
     # make subplots: one for raw + one for each preprocessing step

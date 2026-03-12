@@ -13,7 +13,7 @@ warnings.filterwarnings("ignore", category=pd.errors.SettingWithCopyWarning)
 from .base import RecordingProfile
 from config import RAW_DATA_PATH, PROBES_PATH
 from .path_utils import get_preprocess_hash, get_motion_hash, save_params, get_sorter_hash
-from .si_tools import run_preprocessing_with_motion_correction, run_preprocessing_without_motion_correction, save_processed_recording, detect_probe_motion
+from .si_tools import run_motion_correction, save_processed_recording, detect_motion_cutoffs
 from .si_tools import find_missing_extensions, add_extension_arrays_to_metrics
 from .si_plots import plot_probe_motion, plot_preprocessing_steps, plot_probe_peaks, plot_noise_levels, plot_motion_correction_traces
 from .ks_tools import convert_npy_to_mat, get_best_channels
@@ -60,14 +60,6 @@ class PlexonProfile(RecordingProfile):
             with open(self.data_path / "ripple_info.json", "r") as f:
                 ripple_info = json.load(f)
  
-            '''
-            raw_recording = read_binary(file_paths = self.data_path / f"raw_signal.bin", 
-                                        sampling_frequency = ripple_info["Fs"],
-                                        num_channels = ripple_info["num_channels"],
-                                        dtype = ripple_info["dtype_python"],
-                                        gain_to_uV = ripple_info["gain_to_uV"],
-                                        offset_to_uV = ripple_info["offset_to_uV"]) 
-            '''
             raw_recording = read_binary(file_paths=self.data_path / "raw_signal.bin",
                                         sampling_frequency=ripple_info["Fs"],
                                         num_channels=ripple_info["num_channels"],
@@ -83,7 +75,7 @@ class PlexonProfile(RecordingProfile):
             print("Duration of recording (min):", round((raw_recording.get_num_samples(segment_index=0)/raw_recording.get_sampling_frequency())/60))
             print("Data dtype:", raw_recording.get_dtype())
             print("--------------------------------------------------")
- 
+
             prb = read_probeinterface(self.probe_path)
             raw_recording = raw_recording._set_probes(prb)
  

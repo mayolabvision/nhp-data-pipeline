@@ -28,6 +28,8 @@ class RecordingProfile(ABC):
         self.metrics_path = None
         self.tbl_path = None
         self.figs_path = None
+        self.crop_startSec = None
+        self.crop_endSec = None
 
     def load_metadata(self):
         """Load metadata.json for this session."""
@@ -39,6 +41,9 @@ class RecordingProfile(ABC):
         """Load protocol parameters."""
         with open(self.protocol_path, 'r') as f:
             self.protocol = json.load(f)
+
+        if 'motion_crop' in self.protocol.get('preprocessing', {}) and self.protocol['preprocessing']['motion_crop'] is not True:
+            del self.protocol['preprocessing']['motion_crop']
 
     @abstractmethod
     def prep_session_data(self):

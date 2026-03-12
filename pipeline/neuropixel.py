@@ -14,13 +14,14 @@ warnings.filterwarnings("ignore", category=pd.errors.SettingWithCopyWarning)
 from .base import RecordingProfile
 from config import RAW_DATA_PATH
 from .path_utils import get_preprocess_hash, get_motion_hash, save_params, get_sorter_hash
-from .si_tools import run_preprocessing_with_motion_correction, run_preprocessing_without_motion_correction, save_processed_recording, detect_probe_motion
+from .si_tools import run_motion_correction, save_processed_recording, detect_motion_cutoffs
 from .si_tools import find_missing_extensions, add_extension_arrays_to_metrics
 from .si_plots import plot_probe_motion, plot_preprocessing_steps, plot_probe_peaks, plot_noise_levels, plot_motion_correction_traces
 from .ks_tools import convert_npy_to_mat, get_best_channels
 
 from spikeinterface.sorters import run_sorter
 from spikeinterface.core import load, BaseRecording
+from spikeinterface.preprocessing import apply_preprocessing_pipeline
 from spikeinterface import create_sorting_analyzer, load_sorting_analyzer
 from spikeinterface.extractors import get_neo_streams, read_spikeglx
 from spikeinterface.qualitymetrics import compute_quality_metrics
@@ -28,7 +29,7 @@ from spikeinterface.qualitymetrics import compute_quality_metrics
 class NeuropixelProfile(RecordingProfile):
     def prep_session_data(self):
         self.data_path = Path(RAW_DATA_PATH) / self.session / f"{self.session}_{self.metadata['hardware_config'][self.probe_id]}"
-        
+       
         self.preprocess_hash = get_preprocess_hash(self.protocol["preprocessing"])    
         self.pp_hash, self.motion_hash, self.pp_params, self.motion_params = get_motion_hash(self.protocol['motion_correction'])
         self.preprocess_path = self.data_path / "preprocess" / self.preprocess_hash / self.pp_hash / self.motion_hash
@@ -50,9 +51,15 @@ class NeuropixelProfile(RecordingProfile):
     def preprocessing(self):
         # Check if data has already been preprocessed
         if not (self.preprocess_path / 'params.json').is_file():
-            print(f"--- Loading in raw data for applying preprocessing ---")
+            os.makedirs(self.preprocess_path, exist_ok=True)
+            
+            print(f"Loading in raw data for applying preprocessing......................")
             stream_names, stream_ids = get_neo_streams('spikeglx', self.data_path)
             raw_recording = read_spikeglx(self.data_path, stream_name=f'imec{self.probe_id}.ap', load_sync_channel=False)
+            Fs = raw_recording.get_sampling_frequency()
+
+            print(f"===================================================================")
+            
             print("--------------------------------------------------")
             print("Sampling frequency:", raw_recording.get_sampling_frequency())
             print("Number of channels:", raw_recording.get_num_channels())
@@ -61,15 +68,42 @@ class NeuropixelProfile(RecordingProfile):
             print("Duration of recording (min):", round((raw_recording.get_num_samples(segment_index=0)/raw_recording.get_sampling_frequency())/60))
             print("Data dtype:", raw_recording.get_dtype())
             print("--------------------------------------------------")
+
+            if not (Path(self.figs_path) / "noise_levels.png").is_file():
+                plot_noise_levels(raw_recording,self)
+                print(f"===== distributions of noise_levels plotted =====")
+           
+            print(f"Applying preprocessing pipeline to raw data..........................")
+            pp_dict = (self.protocol["preprocessing"]).copy()
+            if 'motion_crop' in pp_dict:
+                del pp_dict['motion_crop']
+
+            pp_recording = apply_preprocessing_pipeline(raw_recording, pp_dict)
+            pp_recording = pp_recording.astype(float)
             
-            plot_noise_levels(raw_recording,self)
-            print(f"===== distributions of noise_levels plotted =====")
-            plot_preprocessing_steps(raw_recording,self)
-            print(f"===== traces for preprocessing_steps plotted =====")
+            if not (Path(self.figs_path) / "preprocessing_steps.png").is_file(): 
+                plot_preprocessing_steps(raw_recording,self)
+                print(f"===== traces for preprocessing_steps plotted =====")
+            
+            print(f"===================================================================")
+            
+            if 'motion_crop' in self.protocol.get('preprocessing', {}):
+                print(f"Estimating probe motion to crop out shaking...........................")
+                crop_endSec = detect_motion_cutoffs(pp_recording, (self.preprocess_path).parent.parent)
+                self.crop_endSec = crop_endSec; 
+                
+                if not (Path(self.figs_path) / "crop_probe_motion.png").is_file(): 
+                    plot_probe_motion(self)
+                    print(f"===== probe motion and cutoffs plotted =====")
+               
+                raw_recording = raw_recording.frame_slice(end_frame=crop_endSec*Fs) 
+                pp_recording  = pp_recording.frame_slice(end_frame=crop_endSec*Fs)
+ 
+            print(f"===================================================================")
 
             if self.protocol.get('motion_correction'):
-                print(f"--- Preprocessing data with motion correction ---")
-                mc_recording = run_preprocessing_with_motion_correction(raw_recording, self.protocol, self.preprocess_path)
+                print(f"Preprocessing data with motion correction.............................")
+                mc_recording = run_motion_correction(raw_recording, self.protocol, self.preprocess_path)
                 save_processed_recording(mc_recording, self.preprocess_path / 'output')
                 print(f"✓ Preprocessed data saved: {self.preprocess_path}")
                 
@@ -79,26 +113,20 @@ class NeuropixelProfile(RecordingProfile):
                 print(f"===== motion-corrected traces plotted =====")
             
             else:
-                print(f"--- Preprocessing data without motion correction ---")
-                if (self.preprocess_path / 'output').exists(): #and (self.preprocess_path / 'motion.npy').is_file():
-                    mc_recording = load(self.preprocess_path / 'output')
-                else:
-                    mc_recording = run_preprocessing_without_motion_correction(raw_recording, self.protocol, self.preprocess_path)
-                    save_processed_recording(mc_recording, self.preprocess_path / 'output')
-                    print(f"✓ Preprocessed data saved: {self.preprocess_path}")
+                print(f"Preprocessing data without motion correction..........................")
+                save_processed_recording(pp_recording, self.preprocess_path / 'output')
+                print(f"✓ Preprocessed data saved: {self.preprocess_path}")
                                     
-                print(f"Estimating probe motion...........................")
-                if not (self.preprocess_path / 'motion.npy').is_file():
-                    detect_probe_motion(mc_recording, self.preprocess_path)
-                
-                plot_probe_motion(self)
-                print(f"===== probe motion estimated and plotted =====")
-                
             save_params(self.preprocess_path / "params.json", self.motion_params)
             
+            print(f"===================================================================")
             print("Preprocessing of data compete!!!")
+            print(f"===================================================================")
+
         else:
+            print(f"===================================================================")
             print("Preprocessed data already exists, skipping this step")
+            print(f"===================================================================")
         
         convert_npy_to_mat(self.preprocess_path)
     

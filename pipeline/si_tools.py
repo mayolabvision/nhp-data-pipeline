@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from scipy.signal import savgol_filter
+from scipy.ndimage import gaussian_filter1d
 
 from spikeinterface.core import set_global_job_kwargs, BaseRecording
 from spikeinterface.extractors import get_neo_streams, read_spikeglx
@@ -36,23 +37,89 @@ def load_or_compute_peaks(preprocess_path, recording, protocol):
 
     return peaks, peak_locations
 
-def detect_probe_motion(recording, save_path):
-    depths = recording.get_channel_locations()
-    max_depth = int(depths.max(axis=0)[1])
-    
-    filt_recording = bandpass_filter(recording=recording, freq_min=300., freq_max=5000.)
-    motion = compute_motion(filt_recording, preset="medicine", 
-                        detect_kwargs={'method':'locally_exclusive'}, 
-                        localize_peaks_kwargs={'method': 'monopolar_triangulation'},
-                        estimate_motion_kwargs={'win_scale_um': max_depth, 'motion_bound':800, 'time_kernel_width': 60})
+def detect_motion_cutoffs(recording, save_path):
+    if not (save_path / 'crop_motion.npy').is_file():
+        depths = recording.get_channel_locations()
+        max_depth = int(depths.max(axis=0)[1])
+        
+        motion = compute_motion(recording, preset="medicine", 
+                            detect_kwargs={'method':'locally_exclusive'}, 
+                            localize_peaks_kwargs={'method': 'monopolar_triangulation'},
+                            estimate_motion_kwargs={'win_scale_um': max_depth, 'motion_bound':800, 'time_kernel_width': 60})
 
-    np.save(save_path / 'motion.npy', motion.displacement[0])
-    np.save(save_path / 'time_bins.npy', motion.temporal_bins_s[0])
-    np.save(save_path / 'depth_bins.npy', motion.spatial_bins_um)
+        np.save(save_path / 'crop_motion.npy', motion.displacement[0])
+        np.save(save_path / 'crop_time_bins.npy', motion.temporal_bins_s[0])
+        np.save(save_path / 'crop_depth_bins.npy', motion.spatial_bins_um)
     
-def run_preprocessing_with_motion_correction(raw_recording, protocol, preprocess_path):
+    motion = np.load(save_path / 'crop_motion.npy')
+    time_bins = np.load(save_path / 'crop_time_bins.npy')
+    depth_bins = np.load(save_path / 'crop_depth_bins.npy')
+
+    time_bins = time_bins - time_bins[0]       # start time (in sec) at 0
+    motion = (motion - motion[0]).squeeze()    # initial motion at 0 µm
+
+    crop_endSec = find_motion_window(time_bins, motion)
+
+    return crop_endSec
+
+def find_motion_window(time_bins, motion,
+                       min_duration=1800,
+                       ratio_threshold=6,
+                       smooth_sigma=50,
+                       padding_sec=5,
+                       min_jump_um=10):
+    """
+    Find the motion window based on large jumps in the motion trace.
+    - end_time is determined by the first jump that exceeds the threshold
+      while respecting min_duration.
+    """
+    time_bins = np.asarray(time_bins)
+    motion = np.asarray(motion).squeeze()
+
+    motion_s = gaussian_filter1d(motion, sigma=smooth_sigma)
+    dm = np.abs(np.diff(motion_s))
+
+    typical = np.median(dm)
+    if typical == 0:
+        typical = np.mean(dm)
+
+    jump_idx = np.where(dm > ratio_threshold * typical)[0]
+
+    # always start at the first time bin
+    start_time = time_bins[0]
+    end_time = time_bins[-1]
+
+    if len(jump_idx) == 0:
+        return time_bins[-1]
+
+    for idx in jump_idx:
+        if idx < 10:
+            continue
+
+        jump_time = time_bins[idx]
+
+        # compute mean motion before and after the jump
+        mean_before = np.mean(motion_s[max(0, idx-1000):idx])
+        mean_after  = np.mean(motion_s[idx:min(len(motion_s), idx+1000)])
+
+        if abs(mean_after - mean_before) < min_jump_um:
+            continue  # ignore small jumps
+
+        # enforce minimum duration
+        if jump_time - start_time >= min_duration:
+            end_time = jump_time
+            break
+
+    # final safeguard
+    if end_time - start_time < min_duration:
+        return time_bins[-1]
+
+    return end_time - padding_sec
+ 
+def run_motion_correction(raw_recording, protocol, preprocess_path):
     os.makedirs(preprocess_path, exist_ok=True)
-    
+    protocol["preprocessing"].pop("motion_crop", None)
+ 
     if not (preprocess_path / 'motion.npy').exists():
         pp_recording1 = apply_preprocessing_pipeline(raw_recording, protocol['motion_correction']['preprocessing'])
 
@@ -87,6 +154,7 @@ def run_preprocessing_with_motion_correction(raw_recording, protocol, preprocess
             spatial_bins_um=depth_bins,
         )
 
+
     # Preprocessing recording
     pp_recording = apply_preprocessing_pipeline(raw_recording, protocol['preprocessing'])
 
@@ -98,11 +166,6 @@ def run_preprocessing_with_motion_correction(raw_recording, protocol, preprocess
     )
     
     return mc_recording
-
-def run_preprocessing_without_motion_correction(raw_recording, protocol, preprocess_path):
-    pp_recording = apply_preprocessing_pipeline(raw_recording, protocol['preprocessing'])
-
-    return pp_recording.astype(float)
 
 def save_processed_recording(recording, preprocess_path):
     recording = recording.astype(int)
