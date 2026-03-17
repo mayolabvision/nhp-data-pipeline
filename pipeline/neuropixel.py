@@ -13,8 +13,8 @@ warnings.filterwarnings("ignore", category=pd.errors.SettingWithCopyWarning)
 
 from .base import RecordingProfile
 from config import RAW_DATA_PATH
-from .path_utils import get_preprocess_hash, get_motion_hash, save_params, get_sorter_hash
-from .si_tools import run_motion_correction, save_processed_recording, detect_motion_cutoffs
+from .path_utils import get_preprocess_hash, get_motion_hash, get_trim_hash, save_params, get_sorter_hash
+from .si_tools import run_motion_correction, save_processed_recording, detect_motion_cutoffs, apply_pp_pipeline
 from .si_tools import find_missing_extensions, add_extension_arrays_to_metrics
 from .si_plots import plot_probe_motion, plot_preprocessing_steps, plot_probe_peaks, plot_noise_levels, plot_motion_correction_traces
 from .ks_tools import convert_npy_to_mat, get_best_channels
@@ -29,15 +29,22 @@ from spikeinterface.qualitymetrics import compute_quality_metrics
 class NeuropixelProfile(RecordingProfile):
     def prep_session_data(self):
         self.data_path = Path(RAW_DATA_PATH) / self.session / f"{self.session}_{self.metadata['hardware_config'][self.probe_id]}"
-       
+      
+        # preprocess/ preprocess hash / MC preprocess hash / MC hash
         self.preprocess_hash = get_preprocess_hash(self.protocol["preprocessing"])    
         self.pp_hash, self.motion_hash, self.pp_params, self.motion_params = get_motion_hash(self.protocol['motion_correction'])
         self.preprocess_path = self.data_path / "preprocess" / self.preprocess_hash / self.pp_hash / self.motion_hash
         save_params(self.preprocess_path.parent.parent / "params.json", self.protocol['preprocessing'])
         save_params(self.preprocess_path.parent / "params.json", self.pp_params)
-        
+       
+        # shake_trimming / preprocess + shake hashes
+        self.trim_hash, self.shake_hash, self.trim_params, self.shake_params = get_trim_hash(self.protocol['shake_trimming'])
+        self.shake_path = self.data_path / "shake_trimming" / ("-".join([self.preprocess_hash, self.shake_hash]))
+        save_params(self.shake_path / "params.json", self.shake_params)
+
+        # sorting / preprocess + MC preprocess + MC + shake + trim + sorter hashes
         self.sorter_hash, self.sorter_params, _ = get_sorter_hash(self.protocol['sorting'])
-        self.full_hash = "-".join([self.preprocess_hash, self.pp_hash, self.motion_hash, self.sorter_hash])
+        self.full_hash = "-".join([self.preprocess_hash, self.pp_hash, self.motion_hash, self.shake_hash, self.trim_hash, self.sorter_hash])
         self.sorter_path = self.data_path / "sorting" / self.full_hash
  
         self.analyzer_path = self.sorter_path / 'analyzer'
@@ -48,7 +55,12 @@ class NeuropixelProfile(RecordingProfile):
         self.figs_path = self.data_path.parent / "figs" / self.full_hash / f"{self.metadata['hardware_config'][self.probe_id]}_{self.metadata['probe_label'][self.probe_id]}"
         save_params(self.figs_path / "params.json", self.protocol)
 
+        print(f"===================================================================")
+        print(self.protocol)
+        print(f"===================================================================")
+
     def preprocessing(self):
+        print(f"===================================================================")
         # Check if data has already been preprocessed
         if not (self.preprocess_path / 'params.json').is_file():
             os.makedirs(self.preprocess_path, exist_ok=True)
@@ -56,10 +68,7 @@ class NeuropixelProfile(RecordingProfile):
             print(f"Loading in raw data for applying preprocessing......................")
             stream_names, stream_ids = get_neo_streams('spikeglx', self.data_path)
             raw_recording = read_spikeglx(self.data_path, stream_name=f'imec{self.probe_id}.ap', load_sync_channel=False)
-            Fs = raw_recording.get_sampling_frequency()
 
-            print(f"===================================================================")
-            
             print("--------------------------------------------------")
             print("Sampling frequency:", raw_recording.get_sampling_frequency())
             print("Number of channels:", raw_recording.get_num_channels())
@@ -74,33 +83,12 @@ class NeuropixelProfile(RecordingProfile):
                 print(f"===== distributions of noise_levels plotted =====")
            
             print(f"Applying preprocessing pipeline to raw data..........................")
-            pp_dict = (self.protocol["preprocessing"]).copy()
-            if 'motion_crop' in pp_dict:
-                del pp_dict['motion_crop']
+            pp_recording = apply_pp_pipeline(raw_recording, self.protocol)
 
-            pp_recording = apply_preprocessing_pipeline(raw_recording, pp_dict)
-            pp_recording = pp_recording.astype(float)
-            
             if not (Path(self.figs_path) / "preprocessing_steps.png").is_file(): 
                 plot_preprocessing_steps(raw_recording,self)
                 print(f"===== traces for preprocessing_steps plotted =====")
             
-            print(f"===================================================================")
-            
-            if 'motion_crop' in self.protocol.get('preprocessing', {}):
-                print(f"Estimating probe motion to crop out shaking...........................")
-                crop_endSec = detect_motion_cutoffs(pp_recording, (self.preprocess_path).parent.parent)
-                self.crop_endSec = crop_endSec; 
-                
-                if not (Path(self.figs_path) / "crop_probe_motion.png").is_file(): 
-                    plot_probe_motion(self)
-                    print(f"===== probe motion and cutoffs plotted =====")
-               
-                raw_recording = raw_recording.frame_slice(end_frame=crop_endSec*Fs) 
-                pp_recording  = pp_recording.frame_slice(end_frame=crop_endSec*Fs)
- 
-            print(f"===================================================================")
-
             if self.protocol.get('motion_correction'):
                 print(f"Preprocessing data with motion correction.............................")
                 mc_recording = run_motion_correction(raw_recording, self.protocol, self.preprocess_path)
@@ -129,13 +117,62 @@ class NeuropixelProfile(RecordingProfile):
             print(f"===================================================================")
         
         convert_npy_to_mat(self.preprocess_path)
-    
-    def spike_sorting(self):
-        if not (self.sorter_path / 'params.json').is_file():
-            recording = load(self.preprocess_path / 'output')
+   
+    def shake_trimming(self):
+        recording = load(self.preprocess_path / 'output')
 
+        if self.protocol.get('shake_trimming'):
+            os.makedirs(self.shake_path, exist_ok=True)
+            
+            print(f"Estimating probe motion to crop out shaking...........................")
+            crop_endSec = detect_motion_cutoffs(recording, self)
+            
+            if not (Path(self.figs_path) / "shake_trimming.png").is_file(): 
+                plot_probe_motion(self)
+                print(f"===== probe motion and cutoffs plotted =====")
+           
+            Fs = recording.get_sampling_frequency()
+            crop_recording = recording.frame_slice(start_frame=0, end_frame=crop_endSec*Fs) 
+            
+            print("--------------------------------------------------")
+            print("Sampling frequency:", crop_recording.get_sampling_frequency())
+            print("Number of channels:", crop_recording.get_num_channels())
+            print("Number of segments:", crop_recording.get_num_segments())
+            print("Number of samples:", crop_recording.get_num_samples(segment_index=0))
+            print("Duration of recording (min):", round((crop_recording.get_num_samples(segment_index=0)/crop_recording.get_sampling_frequency())/60))
+            print("Data dtype:", crop_recording.get_dtype())
+            print("--------------------------------------------------")
+            
+            print(f"===================================================================")
+            print("Shake trimming of data compete!!!")
+            print(f"===================================================================")
+
+        else:
+            print(f"===================================================================")
+            print("Shake trimming is disabled, skipping this step")
+            print(f"===================================================================")
+            
+ 
+    def spike_sorting(self):
+        print(f"===================================================================")
+        if not (self.sorter_path / 'params.json').is_file():
+            print(f"Loading in preprocessed recording......................")
+            recording = load(self.preprocess_path / 'output')
             _, _, custom_sorter_params = get_sorter_hash(self.protocol['sorting'])
-            sorting = run_sorter(recording=recording, folder=self.sorter_path, 
+            
+            if self.protocol.get('shake_trimming'):
+                print(f"Finding time to trim recording due to excessive motion.......................")
+                self.crop_endSec = detect_motion_cutoffs(recording, self)
+                #custom_sorter_params['tmax'] = self.crop_endSec
+                
+                Fs = recording.get_sampling_frequency()
+                crop_recording = recording.frame_slice(start_frame=0, end_frame=self.crop_endSec*Fs) 
+
+            print("--------------------------------------------------")
+            print(custom_sorter_params)
+            print("--------------------------------------------------")
+            
+            sorting = run_sorter(recording=crop_recording, folder=self.sorter_path, 
                                  verbose=True, save_preprocessed_copy=False, docker_image=False,
                                  clear_cache=True, **custom_sorter_params)
             
@@ -148,7 +185,14 @@ class NeuropixelProfile(RecordingProfile):
         convert_npy_to_mat(self.sorter_path / 'sorter_output')
 
     def postprocessing(self):
+        print(f"Loading in preprocessed recording......................")
         recording = load(self.preprocess_path / 'output')
+        if self.protocol.get('shake_trimming'):
+            self.crop_endSec = detect_motion_cutoffs(recording, self)
+            Fs = recording.get_sampling_frequency()
+            recording = recording.frame_slice(start_frame=0, end_frame=self.crop_endSec*Fs) 
+
+        print(f"Loading in sorting outputs......................")
         sorting = load(self.sorter_path)
 
         if not self.analyzer_path.is_dir():

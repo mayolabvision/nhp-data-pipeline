@@ -20,6 +20,12 @@ class RecordingProfile(ABC):
         self.preprocess_path = None
         self.motion_hash = None
         self.motion_params = None
+        self.shake_path = None
+        self.shake_hash = None
+        self.shake_params = None
+        self.trim_path = None
+        self.trim_hash = None
+        self.trim_params = None
         self.sorter_path = None
         self.sorter_hash = None
         self.sorter_params = None
@@ -28,7 +34,6 @@ class RecordingProfile(ABC):
         self.metrics_path = None
         self.tbl_path = None
         self.figs_path = None
-        self.crop_startSec = None
         self.crop_endSec = None
 
     def load_metadata(self):
@@ -42,9 +47,6 @@ class RecordingProfile(ABC):
         with open(self.protocol_path, 'r') as f:
             self.protocol = json.load(f)
 
-        if 'motion_crop' in self.protocol.get('preprocessing', {}) and self.protocol['preprocessing']['motion_crop'] is not True:
-            del self.protocol['preprocessing']['motion_crop']
-
     @abstractmethod
     def prep_session_data(self):
         """Check and prepare raw data for processing."""
@@ -53,6 +55,11 @@ class RecordingProfile(ABC):
     @abstractmethod
     def preprocessing(self):
         """Applying preprocessing to raw recording."""
+        pass
+    
+    @abstractmethod
+    def shake_trimming(self):
+        """Rejects segements of recording where motion exceeds stability threshold."""
         pass
     
     @abstractmethod

@@ -19,10 +19,10 @@ global_job_kwargs = dict(n_jobs=int(int(os.environ.get("SLURM_CPUS_PER_TASK", "8
 set_global_job_kwargs(**global_job_kwargs)
 
 def plot_probe_motion(profile):
-    motion = np.load((profile.preprocess_path).parent.parent / 'crop_motion.npy')
-    time_bins = np.load((profile.preprocess_path).parent.parent / 'crop_time_bins.npy')
+    motion = np.load(Path(profile.shake_path) / 'motion.npy')
+    time_bins = np.load(Path(profile.shake_path) / 'time_bins.npy')
     
-    motion_s = gaussian_filter1d(motion, sigma=50)
+    motion_s = gaussian_filter1d(motion, sigma=profile.protocol['shake_trimming']['window_params']['smooth_sigma'])
 
     fig, (ax1) = plt.subplots(1, 1, figsize=(15, 4))
 
@@ -41,7 +41,7 @@ def plot_probe_motion(profile):
     fig.text(0.5, 0.88, f"{profile.metadata['hardware_config'][profile.probe_id]}, {profile.metadata['probe_config'][profile.probe_id]}: depth = {profile.metadata['probe_depth_mm'][profile.probe_id]}mm, grid hole = {profile.metadata['probe_gridHole'][profile.probe_id]}", ha='center', fontsize=12)
     
     plt.tight_layout(rect=[0.05, 0.05, 1, 0.97])  # leave space for labels
-    fig.savefig(Path(profile.figs_path) / "crop_probe_motion.png", dpi=300, bbox_inches="tight")
+    fig.savefig(Path(profile.figs_path) / "shake_trimming.png", dpi=300, bbox_inches="tight")
 
 def plot_preprocessing_steps(raw_recording, profile):
     # collect preprocessing steps

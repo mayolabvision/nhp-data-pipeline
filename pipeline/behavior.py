@@ -23,6 +23,9 @@ class BehaviorProfile(RecordingProfile):
     
     def preprocessing(self):
         pass
+    
+    def motion_rejection(self):
+        pass
 
     def spike_sorting(self):
         pass

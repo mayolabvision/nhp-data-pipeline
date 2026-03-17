@@ -52,6 +52,30 @@ def get_motion_hash(motion_params: dict):
 
     return pp_hash, params_hash, motion_params['preprocessing'], full_params
 
+def get_trim_hash(motion_params: dict):
+    drift_preset = motion_params['estimate_motion_kwargs']['method']
+    drift_preset = drift_preset.split("_")[0] if "dredge" in drift_preset else drift_preset
+
+    default_params = get_motion_parameters_preset(drift_preset)
+
+    # 1. Get custom params (only differences + 'method')
+    custom_params = prune_params(motion_params, default_params)
+    #print("Custom params:", custom_params)
+    
+    pp_str = json.dumps(custom_params['window_params'], sort_keys=True)
+    pp_hash = hashlib.md5(pp_str.encode('utf-8')).hexdigest()
+    #print("pp_hash:", pp_hash)
+
+    custom_params_motion = {k: v for k, v in custom_params.items() if k != 'window_params'} 
+    params_str = json.dumps(custom_params_motion, sort_keys=True)
+    params_hash = hashlib.md5(params_str.encode('utf-8')).hexdigest()
+    #print("motion_hash:", params_hash)
+    
+    # 2. Get full params by merging custom into default
+    full_params = merge_params(default_params, custom_params)
+
+    return pp_hash, params_hash, motion_params['window_params'], full_params
+
 def get_sorter_hash(sorter_params: dict):
     default_params = get_default_sorter_params(sorter_params['sorter_name'])
 

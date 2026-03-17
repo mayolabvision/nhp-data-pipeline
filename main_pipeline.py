@@ -25,6 +25,9 @@ def run_preprocess(session, probe_id=0, protocol=None):
     profile.preprocessing()
     print(f"------------ ✓ Preprocessing complete -------------")
     
+    profile.shake_trimming()
+    print(f"------------ ✓ Shaking motion estimation complete -------------")
+    
     return profile
 
 def run_sorting(session, probe_id=0, protocol=None):
