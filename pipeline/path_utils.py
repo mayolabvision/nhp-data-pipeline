@@ -6,6 +6,17 @@ import copy
 from spikeinterface.preprocessing import get_motion_parameters_preset
 from spikeinterface.sorters import get_default_sorter_params
 
+def print_protocol(profile):
+    print(f"===================================================================")
+    print("Preprocess hash: ", profile.preprocess_hash)
+    print("Motion PP hash:  ", profile.pp_hash)
+    print("Motion hash:     ", profile.motion_hash)
+    print("Shake hash:      ", profile.shake_hash)
+    print("Trim hash:       ", profile.trim_hash)
+    print("Sorter hash:     ", profile.sorter_hash)
+    print("FULL HASH:       ", profile.full_hash)
+    print(f"===================================================================") 
+
 def save_params(params_path: Path, params: dict):
     """Save params dict to JSON file at params_path if the file does not already exist."""
     if not params_path.is_file():
@@ -62,11 +73,14 @@ def get_trim_hash(motion_params: dict):
     custom_params = prune_params(motion_params, default_params)
     #print("Custom params:", custom_params)
     
-    pp_str = json.dumps(custom_params['window_params'], sort_keys=True)
+    pp_str = json.dumps(custom_params['preprocessing'], sort_keys=True)
     pp_hash = hashlib.md5(pp_str.encode('utf-8')).hexdigest()
-    #print("pp_hash:", pp_hash)
+    
+    trim_str = json.dumps(custom_params['window_params'], sort_keys=True)
+    trim_hash = hashlib.md5(trim_str.encode('utf-8')).hexdigest()
 
-    custom_params_motion = {k: v for k, v in custom_params.items() if k != 'window_params'} 
+    custom_params_motion = {k: v for k, v in custom_params.items() 
+                        if k not in ['window_params', 'preprocessing']}
     params_str = json.dumps(custom_params_motion, sort_keys=True)
     params_hash = hashlib.md5(params_str.encode('utf-8')).hexdigest()
     #print("motion_hash:", params_hash)
@@ -74,7 +88,7 @@ def get_trim_hash(motion_params: dict):
     # 2. Get full params by merging custom into default
     full_params = merge_params(default_params, custom_params)
 
-    return pp_hash, params_hash, motion_params['window_params'], full_params
+    return pp_hash, params_hash, trim_hash, full_params
 
 def get_sorter_hash(sorter_params: dict):
     default_params = get_default_sorter_params(sorter_params['sorter_name'])

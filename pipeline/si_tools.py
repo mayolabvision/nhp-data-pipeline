@@ -17,18 +17,12 @@ from spikeinterface.sortingcomponents.peak_localization import localize_peaks
 from spikeinterface.sortingcomponents.motion import estimate_motion, correct_motion_on_peaks, InterpolateMotionRecording
 
 cpus = int(os.environ.get("SLURM_CPUS_PER_TASK", "8"))
-
-global_job_kwargs = dict(
-    n_jobs=int(cpus / 4),
-    chunk_duration='1s',
-    progress_bar=True
-)
+global_job_kwargs = dict(n_jobs=int(cpus - 1), chunk_duration='5s', progress_bar=True)
 set_global_job_kwargs(**global_job_kwargs)
 
-#global_job_kwargs = dict(n_jobs=int(int(os.environ.get("SLURM_CPUS_PER_TASK", "8"))-1), chunk_duration='1s', progress_bar=True)
-#set_global_job_kwargs(**global_job_kwargs)
-
 def load_or_compute_peaks(preprocess_path, recording, protocol):
+    job_kwargs = dict(chunk_duration="2s", n_jobs=8, progress_bar=True)
+
     peaks_path = Path(preprocess_path).parent / "peaks.npy"
     peak_locs_path = Path(preprocess_path).parent / "peak_locations.npy"
 
@@ -38,8 +32,8 @@ def load_or_compute_peaks(preprocess_path, recording, protocol):
         peak_locations = np.load(peak_locs_path, allow_pickle=True)
     else:
         print("Calculating peaks and peak locations...")
-        peaks = detect_peaks(recording=recording, **protocol['detect_kwargs'])
-        peak_locations = localize_peaks(recording, peaks, **protocol['localize_peaks_kwargs'])
+        peaks = detect_peaks(recording=recording, **protocol['detect_kwargs'], **job_kwargs)
+        peak_locations = localize_peaks(recording, peaks, **protocol['localize_peaks_kwargs'], **job_kwargs)
         
         np.save(peaks_path, peaks)
         np.save(peak_locs_path, peak_locations)
@@ -47,17 +41,25 @@ def load_or_compute_peaks(preprocess_path, recording, protocol):
     return peaks, peak_locations
 
 def detect_motion_cutoffs(recording, self):
+    cpus = int(os.environ.get("SLURM_CPUS_PER_TASK", "8"))
+    job_kwargs = dict(chunk_duration="2s", n_jobs=int(cpus - 2), progress_bar=True)
+    
     save_path = Path(self.shake_path)
     if not (save_path / 'motion.npy').is_file():
-        depths = recording.get_channel_locations()
-        max_depth = int(depths.max(axis=0)[1])
+        pp_recording = apply_preprocessing_pipeline(recording, self.protocol["shake_trimming"]["preprocessing"])
         
-        motion = compute_motion(recording,
+        depths = recording.get_channel_locations()
+        max_depth = int(depths.max(axis=0)[1]) 
+
+        est_kwargs = self.protocol["shake_trimming"].get("estimate_motion_kwargs", {})
+        est_kwargs["win_scale_um"] = max_depth
+
+        motion = compute_motion(pp_recording,
                     preset=self.protocol["shake_trimming"].get("estimate_motion_kwargs", {}).pop("method", "medicine"),
                     detect_kwargs=self.protocol["shake_trimming"].get("detect_kwargs", {}),
                     localize_peaks_kwargs=self.protocol["shake_trimming"].get("localize_peaks_kwargs", {}),
-                    estimate_motion_kwargs=self.protocol["shake_trimming"].get("estimate_motion_kwargs", {})
-                )
+                    estimate_motion_kwargs=est_kwargs, **job_kwargs
+                    )
          
         np.save(save_path / 'motion.npy', motion.displacement[0])
         np.save(save_path / 'time_bins.npy', motion.temporal_bins_s[0])

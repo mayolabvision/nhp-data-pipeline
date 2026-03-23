@@ -1,5 +1,8 @@
 {
   "sess_name": "kendra_scrappy_0000a",
+  "monkey": "scrappy", 
+  "experimenter": "kendra", 
+
   "probe_label": ["lFEF","rFEF"],
   "probe_type": ["neuropixel","neuropixel"],
   "probe_config": ["nhp_long_1.0","nhp_long_1.0"],

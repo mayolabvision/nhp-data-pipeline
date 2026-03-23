@@ -1,5 +1,8 @@
 {
-  "sess_name": "experimenter_monkey_0000a",
+  "sess_name": "session_0000a",
+  "monkey": "monkey", 
+  "experimenter": "experimenter", 
+
   "probe_label": [],
   "probe_type": [],
   "probe_config": [],

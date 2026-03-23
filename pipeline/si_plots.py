@@ -2,7 +2,12 @@
 import os
 from pathlib import Path
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
+from matplotlib.cm import ScalarMappable
+from matplotlib.colors import Normalize
+
 from scipy.signal import savgol_filter
 from scipy.ndimage import gaussian_filter1d
 
@@ -12,8 +17,15 @@ from spikeinterface.preprocessing import apply_preprocessing_pipeline
 from spikeinterface.core.motion import Motion
 from spikeinterface.core import get_noise_levels
 import spikeinterface.widgets as sw
+from spikeinterface.widgets import UnitSummaryWidget
 
 from medicine.plotting import plot_motion_correction
+
+from kilosort.io import load_ops
+from kilosort.data_tools import (
+    mean_waveform, cluster_templates, get_good_cluster, get_cluster_spikes,
+    get_spike_waveforms, get_best_channels
+    )
 
 global_job_kwargs = dict(n_jobs=int(int(os.environ.get("SLURM_CPUS_PER_TASK", "8"))-1), chunk_duration='1s', progress_bar=True)
 set_global_job_kwargs(**global_job_kwargs)
@@ -41,7 +53,7 @@ def plot_probe_motion(profile):
     fig.text(0.5, 0.88, f"{profile.metadata['hardware_config'][profile.probe_id]}, {profile.metadata['probe_config'][profile.probe_id]}: depth = {profile.metadata['probe_depth_mm'][profile.probe_id]}mm, grid hole = {profile.metadata['probe_gridHole'][profile.probe_id]}", ha='center', fontsize=12)
     
     plt.tight_layout(rect=[0.05, 0.05, 1, 0.97])  # leave space for labels
-    fig.savefig(Path(profile.figs_path) / "shake_trimming.png", dpi=300, bbox_inches="tight")
+    fig.savefig(Path(profile.figs_path) / "probe_motion_cutoff.png", dpi=300, bbox_inches="tight")
 
 def plot_preprocessing_steps(raw_recording, profile):
     # collect preprocessing steps
@@ -175,4 +187,151 @@ def plot_motion_correction_traces(raw_recording, profile):
 
     plt.tight_layout(rect=[0.05, 0.05, 1, 0.96])  # leave space for labels
     fig4.savefig(Path(profile.figs_path) / "motion_correction.png", dpi=300, bbox_inches="tight")
+
+
+def plot_analyzer_sess(analyzer, metrics, profile):
+    fig = plt.figure(figsize=(12, 12))  # adjust as needed
+    gs = GridSpec(10, 5, figure=fig)
+
+    # Create axes with your specified layout
+    ax0 = fig.add_subplot(gs[0:9, 0]) 
+    ax1 = fig.add_subplot(gs[0:2, 1:4]) 
+    ax2 = fig.add_subplot(gs[2:4, 1:4]) 
+    ax3 = fig.add_subplot(gs[4:7, 1:3]) 
+    ax4 = fig.add_subplot(gs[4:6, 3:4])
+    ax5 = fig.add_subplot(gs[6:7, 3:4])
+    ax6 = fig.add_subplot(gs[7:9, 1:2])
+    ax7 = fig.add_subplot(gs[7:9, 2:3])
+    ax8 = fig.add_subplot(gs[7:9, 3:4])
+
+    # Now call your plotting functions on each axis
+    sw.plot_unit_depths(analyzer, ax=ax0)
+
+    sw.plot_all_amplitudes_distributions(analyzer, unit_ids=[0,1,2,3,4,5], ax=ax1)
+    ax1.set_xlabel("clusters")
+    ax1.set_xticks([])
+    ax1.set_ylabel("amplitude")
+
+    sw.plot_unit_presence(analyzer, time_range=[0, 60], ax=ax2)
+    ax2.set_ylabel("clusters")
+    cbar = ax2.figure.axes[-1]  # colorbar axis is usually last
+    cbar.set_ylabel("normalized activity")  # label it
+
+    sw.plot_template_similarity(analyzer, ax=ax3)
+    ax3.set_xlabel("cluster 1")
+    ax3.set_ylabel("cluster 2")
+    cbar = ax3.figure.axes[-1]  # colorbar axis is usually last
+    cbar.set_ylabel("template similarity")  # label it
+
+    ax4.hist(metrics["firing_rate"], bins=20)
+    ax4.set_xlabel("firing rate (Hz)")
+    ax4.set_ylabel("number of clusters")
+
+    ax5.hist(metrics["presence_ratio"], bins=20)
+    ax5.set_xlabel("presence_ratio")
+    ax5.set_ylabel("number of clusters")
+
+    ax6.hist(metrics["snr"], bins=20)
+    ax6.set_xlabel("SNR")
+    ax6.set_ylabel("number of clusters")
+
+    ax7.hist(metrics["rp_contamination"], bins=20)
+    ax7.set_xlabel("rp_contamination")
+
+    ax8.hist(metrics["amplitude_cutoff"], bins=20)
+    ax8.set_xlabel("amplitude_cutoff")
+
+    fig.suptitle(f"{profile.session} --- {profile.metadata['probe_label'][profile.probe_id]}", fontsize=16, y=0.98)
+    fig.text(0.5, 0.94, f"{profile.metadata['hardware_config'][profile.probe_id]}, {profile.metadata['probe_config'][profile.probe_id]}: depth = {profile.metadata['probe_depth_mm'][profile.probe_id]}mm, grid hole = {profile.metadata['probe_gridHole'][profile.probe_id]}", ha='center', fontsize=12)
+
+    plt.tight_layout(rect=[0.05, 0.05, 1, 0.95])  # leave space for labels
+    fig.savefig(Path(profile.figs_path) / "analyzer_summary.png", dpi=300, bbox_inches="tight")
+
+def plot_si_units(analyzer, profile, cluster_id): 
+ 
+    fig = plt.figure(figsize=(12, 10))
+    widget = UnitSummaryWidget(analyzer, unit_id=cluster_id, backend="matplotlib", figure=fig)
+
+    fig.suptitle(f"{profile.session} --- {profile.metadata['probe_label'][profile.probe_id]}", fontsize=16, y=0.98)
+    fig.text(0.5, 0.94, f"{profile.metadata['hardware_config'][profile.probe_id]}, {profile.metadata['probe_config'][profile.probe_id]}: depth = {profile.metadata['probe_depth_mm'][profile.probe_id]}mm, grid hole = {profile.metadata['probe_gridHole'][profile.probe_id]}", ha='center', fontsize=12)
+
+    plt.tight_layout(rect=[0.05, 0.05, 1, 0.95])  # leave space for labels
+    fig.savefig(Path(profile.figs_path) / 'clusters' / f"clust{cluster_id:04d}_si.png", dpi=300, bbox_inches="tight")
+
+def plot_ks_units(profile, cluster_id): 
+
+    ops = np.load(profile.sorter_path / 'sorter_output' / 'ops.npy', allow_pickle=True).item()
+    fname = ops['filename']
+    if isinstance(fname, str) and 'PosixPath' in fname:
+        import re
+        fname = re.search(r"PosixPath\('(.+)'\)", fname).group(1)
+
+        ops['filename'] = str(fname)
+        np.save(profile.sorter_path / 'sorter_output' / 'ops.npy', ops)
+
+    # Get the mean spike waveform and mean templates for the cluster
+    mean_wv, spike_subset = mean_waveform(cluster_id, profile.sorter_path / 'sorter_output', n_spikes=500,
+                                          bfile=None, best=True)
+    mean_temp = cluster_templates(cluster_id, profile.sorter_path / 'sorter_output', mean=True,
+                                  best=True, spike_subset=spike_subset)
+    chan = get_best_channels(profile.sorter_path / 'sorter_output')[cluster_id]
+    # Get n spike times for this cluster
+    spike_times, _ = get_cluster_spikes(cluster_id, profile.sorter_path / 'sorter_output', n_spikes=500)
+    # Time in s for spike time axis
+    t2 = spike_times / ops['fs']
+    t = (np.arange(ops['nt']) / ops['fs']) * 1000
+    # Get single-channel waveform for each spike
+    waves = get_spike_waveforms(spike_times, profile.sorter_path / 'sorter_output', chan=chan)
+
+
+    fig = plt.figure(figsize=(12, 10))  # adjust as needed
+    gs = GridSpec(10, 7, figure=fig)
+
+    # Create axes with your specified layout
+    ax0 = fig.add_subplot(gs[0:9, 0:1]) 
+    ax1 = fig.add_subplot(gs[0:4, 1:6])
+    ax2 = fig.add_subplot(gs[4:9, 1:6])
+
+
+    im = ax0.imshow(waves.T, aspect='auto', extent=[t[0], t[-1], t2[0], t2[-1]])
+    ax0.set_xlabel('Time (ms)')
+    ax0.set_ylabel('Spike time (s)')
+    cbar = plt.colorbar(im, ax=ax0, orientation='horizontal', pad=0.1)
+    cbar.set_label('Amplitude (µV)')
+
+    ax1.plot(t, mean_wv, c='black', linestyle='dashed', linewidth=2, label='waveform')
+    ax1.plot(t, mean_temp, linewidth=1, label='template')
+    ax1.set_title(f'unit_id: {cluster_id}')
+    ax1.set_xlabel('Time (ms)')
+    ax1.legend()
+
+    n_waveforms = waves.shape[1]  # 500
+    cmap = plt.cm.bwr  # blue-white-red
+    colors = [cmap(i / n_waveforms) for i in range(n_waveforms)]
+
+    # Plot each waveform with color gradient and transparency
+    cmap = plt.cm.bwr  # blue → red
+    norm = Normalize(vmin=0, vmax=n_waveforms-1)  # normalize waveform index
+
+    # Plot each waveform with color gradient and transparency
+    for i in range(n_waveforms):
+        ax2.plot(t, waves[:, i], color=cmap(norm(i)), alpha=0.2)
+
+    ax2.set_xlabel('Time (ms)')
+    ax2.set_ylabel('Amplitude (µV)')
+    ax2.set_title('Spike waveforms (blue → red, transparent)')
+
+    # Add colorbar
+    sm = ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])  # needed for colorbar
+    cbar = plt.colorbar(sm, ax=ax2, orientation='vertical', pad=0.01, shrink=0.85)
+    cbar.set_label('Time in session (blue = start, red = end)')
+
+    fig.suptitle(f"{profile.session} --- {profile.metadata['probe_label'][profile.probe_id]}", fontsize=16, y=0.98)
+    fig.text(0.5, 0.94, f"{profile.metadata['hardware_config'][profile.probe_id]}, {profile.metadata['probe_config'][profile.probe_id]}: depth = {profile.metadata['probe_depth_mm'][profile.probe_id]}mm, grid hole = {profile.metadata['probe_gridHole'][profile.probe_id]}", ha='center', fontsize=12)
+
+    plt.tight_layout(rect=[0.05, 0.05, 1, 0.95])  # leave space for labels
+    fig.savefig(Path(profile.figs_path) / 'clusters' / f"clust{cluster_id:04d}_ks.png", dpi=300, bbox_inches="tight")
+
+
 
