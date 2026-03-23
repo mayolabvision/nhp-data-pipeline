@@ -1,5 +1,8 @@
 {
-  "sess_name": "experimenter_monkey_0000a",
+  "sess_name": "session_0000a",
+  "monkey": "monkey", 
+  "experimenter": "experimenter", 
+
   "probe_label": ["lFEF","rFEF"],
   "probe_type": ["neuropixel","neuropixel"],
   "probe_config": ["nhp_long_1.0","nhp_long_1.0"],

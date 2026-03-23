@@ -2,10 +2,10 @@
 #SBATCH --nodes=1
 #SBATCH --time=0-23:59:59
 #SBATCH --cluster=smp
-#SBATCH --partition=high-mem
+#SBATCH --partition=smp
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=16
-#SBATCH --job-name=preproc
+#SBATCH --cpus-per-task=8
+#SBATCH --job-name=shake
 #SBATCH --error=/ix1/pmayo/outfiles/out_%A_%a.out
 #SBATCH --output=/ix1/pmayo/outfiles/out_%A_%a.out
 #SBATCH --mail-type=done,fail
@@ -33,34 +33,13 @@ echo "PROTOCOL   =  $PROTOCOL"
 echo "======================================================"
 
 #################################################################
-################ Check that raw signal exists ###################
+##################### RUN MOTION ESTIMATION ########################
 
-module load matlab/R2023a
-NEV_PATH=$(python -c "import config; print(config.NEVUTIL_PATH)")
-RAW_DATA_PATH=$(python -c "import config; print(config.RAW_DATA_PATH)")
-PROBES_PATH=$(python -c "import config; print(config.PROBES_PATH)")
-DATA_PATH="${RAW_DATA_PATH}/${SESSION}"
-
-echo "Checking for raw signal in Ripple files..............."
-matlab -nodisplay <<EOF
-addpath(genpath('matlab'));
-addpath(genpath('${NEV_PATH}'));
-fprintf('Running rawRipple_to_binaryFile for ${SESSION}\n');
-rawRipple_to_binaryFile('${DATA_PATH}', '${PROBES_PATH}', $((PROBE_ID + 1)));
-exit
-EOF
-
-sleep 5
-echo "=================================================="
-
-#################################################################
-##################### RUN SORTING ########################
-
-echo "Running preprocessing pipeline........................"
+echo "Running shake trimming pipeline........................"
 $CONDA_PREFIX/bin/python -c "
-from main_pipeline import run_preprocess
+from main_pipeline import run_shakeTrimming
 
-run_preprocess(
+run_shakeTrimming(
     '${SESSION}', 
     probe_id=int('${PROBE_ID}'),
     protocol='${PROTOCOL}.json' 

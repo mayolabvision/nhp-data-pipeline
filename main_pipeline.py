@@ -27,6 +27,20 @@ def run_preprocess(session, probe_id=0, protocol=None):
     
     return profile
 
+def run_shakeTrimming(session, probe_id=0, protocol=None):
+    profile_cls = get_recording_profile(session, probe_id)
+    profile = profile_cls(session, probe_id, Path(PROTOCOLS_PATH) / protocol)
+
+    profile.load_metadata()
+    profile.load_protocol()
+    profile.prep_session_data()
+    
+    # Estimate probe drift to detect high motion
+    profile.shake_trimming()
+    print(f"------------ ✓ Shaking motion estimation complete -------------")
+    
+    return profile
+
 def run_sorting(session, probe_id=0, protocol=None):
     profile_cls = get_recording_profile(session, probe_id)
     profile = profile_cls(session, probe_id, Path(PROTOCOLS_PATH) / protocol)

@@ -100,6 +100,9 @@ class PlexonProfile(RecordingProfile):
             print("Preprocessed data already exists, skipping this step")
         
         convert_npy_to_mat(self.preprocess_path)
+    
+    def motion_rejection(self):
+        pass
 
     def spike_sorting(self):
         if not (self.sorter_path / 'params.json').is_file():

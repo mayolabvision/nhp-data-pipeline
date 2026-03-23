@@ -1,5 +1,8 @@
 {
-  "sess_name": "experimenter_monkey_0000a",
+  "sess_name": "session_0000a",
+  "monkey": "monkey", 
+  "experimenter": "experimenter", 
+
   "probe_label": ["lFEF"],
   "probe_type": ["plexon"],
   "probe_config": ["PLX-SP-24-15SE_150-210-100_640-30-540-1_CON_32m-V"],
