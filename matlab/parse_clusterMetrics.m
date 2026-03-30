@@ -14,6 +14,8 @@ ks_path = p.Results.kilosort4_path;
 metrics = readtable(fullfile(kilosort4_path,'quality_metrics','cluster_metrics.csv'), 'Delimiter', ',');
 
 metrics.sess_name = categorical(metrics.sess_name);
+metrics.monkey    = categorical(metrics.monkey);
+metrics.experimenter = categorical(metrics.experimenter);
 metrics.probe_label = categorical(metrics.probe_label);
 metrics.probe_type = categorical(metrics.probe_type);
 metrics.probe_config = categorical(metrics.probe_config);

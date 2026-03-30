@@ -158,7 +158,7 @@ elseif any(contains(taskName, {'purs', 'pursuit'}))
         end
     end
 
-    if ~ismember('speed',tbl.Properties.VariableNames) || ~ismember('pursuitSpeed',tbl.Properties.VariableNames)
+    if ~ismember('speed',tbl.Properties.VariableNames)
         tbl.speed = repmat(tbl(1,:).params.block.pursuitSpeed,height(tbl),1);
     end
     if ~ismember('angle',tbl.Properties.VariableNames)

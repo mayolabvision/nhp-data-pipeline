@@ -1,5 +1,6 @@
 import numpy as np
 import os
+from pathlib import Path
 from scipy.io import savemat
 
 def get_best_channels(results_dir):
@@ -41,3 +42,4 @@ def convert_npy_to_mat(directory):
 
             except Exception as e:
                 print(f"Failed to load {file}: {e}")
+

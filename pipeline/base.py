@@ -77,3 +77,8 @@ class RecordingProfile(ABC):
         """Calculate quality metrics from sorting_analyzer."""
         pass
     
+    @abstractmethod
+    def post_widgets(self, job_id=0, n_chunks=1):
+        """Plotting post-pipeline plots with widgets."""
+        pass
+    

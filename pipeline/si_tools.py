@@ -169,7 +169,7 @@ def run_motion_correction(raw_recording, protocol, preprocess_path):
 
 
     # Preprocessing recording
-    pp_recording = apply_preprocessing_pipeline(raw_recording, protocol['preprocessing'])
+    pp_recording = apply_preprocessing_pipeline(raw_recording, protocol["preprocessing"])
 
     # Use interpolation to correct for estimated motion
     mc_recording = InterpolateMotionRecording(
@@ -192,6 +192,40 @@ def save_processed_recording(recording, preprocess_path):
     recording = recording.save(folder=preprocess_path, format='binary', dtype='int16', overwrite=True)
     
     return recording
+
+
+def get_mean_waveforms(analyzer):
+    """
+    Returns mean waveform on the best channel for each unit.
+    Output shape per unit: (n_samples,)
+    """
+    wf_ext = analyzer.get_extension("waveforms")
+    mean_wfs = {}
+
+    for unit_id in analyzer.unit_ids:
+        wfs = wf_ext.get_waveforms_one_unit(unit_id)  # (n_spikes, n_samples, n_channels_sparse)
+
+        if wfs is None or wfs.shape[0] == 0:
+            mean_wfs[unit_id] = np.array([])
+            continue
+
+        unit_index = list(analyzer.unit_ids).index(unit_id)
+
+        # global channel indices for this unit
+        chan_inds_global = np.where(analyzer.sparsity.mask[unit_index])[0]
+
+        # best channel (global index)
+        best_chan_global = chan_inds_global[0]
+
+        # 🔑 convert to LOCAL index
+        best_chan_local = np.where(chan_inds_global == best_chan_global)[0][0]
+
+        # extract waveform
+        wfs_best = wfs[:, :, best_chan_local]  # (n_spikes, n_samples)
+
+        mean_wfs[unit_id] = wfs_best.mean(axis=0)
+
+    return mean_wfs
 
 ######################################################################################################
 

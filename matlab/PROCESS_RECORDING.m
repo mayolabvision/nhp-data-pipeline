@@ -376,6 +376,8 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
                     sorting.clusters = [metrics removevars(sorting.clusters, 'cluster_id')];
                 else
                     sorting.clusters.sess_name = repmat(metadata.sess_name,height(sorting.clusters),1);
+                    sorting.clusters.monkey = repmat(metadata.monkey,height(sorting.clusters),1);
+                    sorting.clusters.experimenter = repmat(metadata.experimenter,height(sorting.clusters),1);
                     sorting.clusters.probe_id = repmat(probe-1,height(sorting.clusters),1);
                     sorting.clusters.probe_index = repmat(probe,height(sorting.clusters),1);
                     sorting.clusters.probe_label = repmat(metadata.probe_label{probe},height(sorting.clusters),1);
@@ -397,13 +399,13 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
                 end
 
                 motion_path = fullfile(RAW_PATH, session_name, [session_name, '_', metadata.hardware_config{probe}], 'preprocess', preprocess_hash, pp_hash, motion_hash);
-                load(fullfile(motion_path,'motion.mat'));
-                load(fullfile(motion_path,'depth_bins.mat'));
-                load(fullfile(motion_path,'time_bins.mat'));
+                %load(fullfile(motion_path,'motion.mat'));
+                %load(fullfile(motion_path,'depth_bins.mat'));
+                %load(fullfile(motion_path,'time_bins.mat'));
 
-                sorting.motion = double(motion);
-                sorting.depth_bins = double(depth_bins);
-                sorting.time_bins = double(time_bins);
+                %sorting.motion = double(motion);
+                %sorting.depth_bins = double(depth_bins);
+                %sorting.time_bins = double(time_bins);
 
                 sorting_all = [sorting_all; sorting];
             end

@@ -207,12 +207,15 @@ def plot_analyzer_sess(analyzer, metrics, profile):
     # Now call your plotting functions on each axis
     sw.plot_unit_depths(analyzer, ax=ax0)
 
-    sw.plot_all_amplitudes_distributions(analyzer, unit_ids=[0,1,2,3,4,5], ax=ax1)
+    sw.plot_all_amplitudes_distributions(analyzer, ax=ax1)
     ax1.set_xlabel("clusters")
     ax1.set_xticks([])
     ax1.set_ylabel("amplitude")
 
-    sw.plot_unit_presence(analyzer, time_range=[0, 60], ax=ax2)
+    # compute total duration in minutes
+    session_duration_min = (analyzer.recording.get_num_frames() / analyzer.sampling_frequency) / 60
+
+    sw.plot_unit_presence(analyzer, time_range=[0, session_duration_min], ax=ax2)
     ax2.set_ylabel("clusters")
     cbar = ax2.figure.axes[-1]  # colorbar axis is usually last
     cbar.set_ylabel("normalized activity")  # label it
@@ -223,23 +226,38 @@ def plot_analyzer_sess(analyzer, metrics, profile):
     cbar = ax3.figure.axes[-1]  # colorbar axis is usually last
     cbar.set_ylabel("template similarity")  # label it
 
+    mean_val = metrics["firing_rate"].mean()
     ax4.hist(metrics["firing_rate"], bins=20)
+    ax4.axvline(mean_val, linestyle="--")
     ax4.set_xlabel("firing rate (Hz)")
     ax4.set_ylabel("number of clusters")
+    ax4.set_title(f"mean = {mean_val:.2f} Hz")
 
+    mean_val = metrics["presence_ratio"].mean()
     ax5.hist(metrics["presence_ratio"], bins=20)
+    ax5.axvline(mean_val, linestyle="--")
     ax5.set_xlabel("presence_ratio")
     ax5.set_ylabel("number of clusters")
+    ax5.set_title(f"mean = {mean_val:.2f}")
 
+    mean_val = metrics["snr"].mean()
     ax6.hist(metrics["snr"], bins=20)
+    ax6.axvline(mean_val, linestyle="--")
     ax6.set_xlabel("SNR")
     ax6.set_ylabel("number of clusters")
+    ax6.set_title(f"mean = {mean_val:.2f}")
 
+    mean_val = metrics["rp_contamination"].mean()
     ax7.hist(metrics["rp_contamination"], bins=20)
+    ax7.axvline(mean_val, linestyle="--")
     ax7.set_xlabel("rp_contamination")
+    ax7.set_title(f"mean = {mean_val:.2f}")
 
+    mean_val = metrics["amplitude_cutoff"].mean()
     ax8.hist(metrics["amplitude_cutoff"], bins=20)
+    ax8.axvline(mean_val, linestyle="--")
     ax8.set_xlabel("amplitude_cutoff")
+    ax8.set_title(f"mean = {mean_val:.2f}")
 
     fig.suptitle(f"{profile.session} --- {profile.metadata['probe_label'][profile.probe_id]}", fontsize=16, y=0.98)
     fig.text(0.5, 0.94, f"{profile.metadata['hardware_config'][profile.probe_id]}, {profile.metadata['probe_config'][profile.probe_id]}: depth = {profile.metadata['probe_depth_mm'][profile.probe_id]}mm, grid hole = {profile.metadata['probe_gridHole'][profile.probe_id]}", ha='center', fontsize=12)

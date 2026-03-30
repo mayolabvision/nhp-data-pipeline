@@ -14,7 +14,7 @@ warnings.filterwarnings("ignore", category=pd.errors.SettingWithCopyWarning)
 from .base import RecordingProfile
 from config import RAW_DATA_PATH
 from .path_utils import get_preprocess_hash, get_motion_hash, get_trim_hash, save_params, get_sorter_hash
-from .si_tools import run_motion_correction, save_processed_recording, detect_motion_cutoffs
+from .si_tools import run_motion_correction, save_processed_recording, detect_motion_cutoffs, get_mean_waveforms
 from .si_tools import find_missing_extensions, add_extension_arrays_to_metrics
 from .si_plots import plot_probe_motion, plot_preprocessing_steps, plot_probe_peaks, plot_noise_levels, plot_motion_correction_traces, plot_analyzer_sess, plot_si_units, plot_ks_units
 from .ks_tools import convert_npy_to_mat, get_best_channels
@@ -86,10 +86,10 @@ class NeuropixelProfile(RecordingProfile):
             os.makedirs(self.preprocess_path, exist_ok=True)
 
             print(f"Applying preprocessing pipeline to raw data..........................")
-            split_recording = raw_recording.split_by("group")
+            #split_recording = raw_recording.split_by("group")
            
-            pp_recording = apply_preprocessing_pipeline(split_recording, self.protocol["preprocessing"])
-            pp_recording = aggregate_channels(pp_recording)
+            pp_recording = apply_preprocessing_pipeline(raw_recording, self.protocol["preprocessing"])
+            #pp_recording = aggregate_channels(pp_recording)
 
             if self.protocol.get('motion_correction'):
                 print(f"Preprocessing data with motion correction.............................")
@@ -198,6 +198,7 @@ class NeuropixelProfile(RecordingProfile):
         
         else:
             print("Sorted outputs already exist, skipping spike sorting")
+        
         print(f"===================================================================")
         print("~~~~~~~~~~~~~~PIPELINE STAGE 3: SPIKE SORTING COMPLETE~~~~~~~~~~~~~~")
         print(f"===================================================================")
@@ -244,7 +245,7 @@ class NeuropixelProfile(RecordingProfile):
         print(f"Loading in sorting analyzer......................")
         analyzer = load_sorting_analyzer(self.analyzer_path)
 
-        if not (Path(self.metrics_path) / "cluster_metrics.csv").is_file(): 
+        if not (Path(self.metrics_path) / "cluster_metrics666.csv").is_file(): 
             print(f"Computing quality metrics......................")
             metrics = compute_quality_metrics(
                     analyzer,
@@ -269,9 +270,15 @@ class NeuropixelProfile(RecordingProfile):
             else:
                 new_cols = ["sess_name","monkey","experimenter","probe_id","cluster_id","probe_label","probe_type","probe_config",
                             "hardware_config","probe_depth_mm","probe_gridHole"]
-
             metrics = metrics[new_cols + [col for col in metrics.columns if col not in new_cols]]
             metrics = add_extension_arrays_to_metrics(self.analyzer_path / "extensions", metrics)
+
+            mean_wfs = get_mean_waveforms(analyzer)
+            metrics['mean_waveform'] = [
+                mean_wfs.get(unit_id, np.array([]))
+                for unit_id in metrics['cluster_id']
+            ]
+            print("✓ Waveforms for each unit pulled.")
 
             save_params(self.metrics_path / "params.json", self.protocol['quality_metrics'])
             metrics.to_csv(self.metrics_path / 'cluster_metrics.csv', index=False)
@@ -281,23 +288,44 @@ class NeuropixelProfile(RecordingProfile):
             print("cluster_metrics already exists, loading in df")
 
         print(f"Plotting analyzer summary and metrics......................")
-        if not (Path(self.figs_path) / "analyzer_summary.png").is_file(): 
+        if not (Path(self.figs_path) / "analyzer_summary666.png").is_file(): 
             plot_analyzer_sess(analyzer, metrics, self) 
             print(f"===== analyzer session summary plotted =====")
         
-        os.makedirs(Path(self.figs_path) / "clusters", exist_ok=True)
-        for i, (idx, row) in enumerate(metrics.iterrows(), start=1):
-            cluster_id = row['cluster_id']
-            if i % 10 == 0:
-                print('.', end='', flush=True)
-            
-            if not (Path(self.figs_path) / "clusters" / f"clust{cluster_id:04d}_si.png").is_file(): 
-                plot_si_units(analyzer, self, cluster_id)
-                plot_ks_units(self, cluster_id)
- 
-        print(f"===== analyzer per units plotted =====")
- 
         print(f"===================================================================")
         print("~~~~~~~~~~~~~PIPELINE STAGE 5: QUALITY METRICS CALCULATED~~~~~~~~~~~")
         print(f"===================================================================")
+
+
+    def post_widgets(self, job_id=0, n_chunks=1):
+        print("Loading cluster metrics.....................")
+        metrics = pd.read_csv(Path(self.metrics_path) / "cluster_metrics.csv")      
+
+        print(f"Loading in sorting analyzer......................")
+        analyzer = load_sorting_analyzer(self.analyzer_path)
+
+        os.makedirs(Path(self.figs_path) / "clusters", exist_ok=True)
+        
+        # ---- Chunking logic ----
+        n_rows = len(metrics)
+        chunk_size = int(np.ceil(n_rows / n_chunks))
+
+        start_idx = job_id * chunk_size
+        end_idx = min((job_id + 1) * chunk_size, n_rows)
+
+        print(f"Job {job_id}/{n_chunks} processing rows {start_idx}:{end_idx}")
+        metrics_chunk = metrics.iloc[start_idx:end_idx]
+
+        # ---- Loop only over this chunk ----
+        for i, (idx, row) in enumerate(metrics_chunk.iterrows(), start=1):
+            cluster_id = row['cluster_id']
+            print('.', end='', flush=True)
+
+            out_file = Path(self.figs_path) / "clusters" / f"clust{cluster_id:04d}_si.png"
+
+            if not out_file.is_file():
+                plot_si_units(analyzer, self, cluster_id)
+                plot_ks_units(self, cluster_id)
+
+        print(f"\n===== analyzer per units plotted (job {job_id}) =====")
 

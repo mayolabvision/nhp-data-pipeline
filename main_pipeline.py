@@ -62,6 +62,7 @@ def run_postprocess(session, probe_id=0, protocol=None):
     profile.load_metadata()
     profile.load_protocol()
     profile.prep_session_data()
+    profile.spike_sorting()
     
     profile.postprocessing()
     print(f"-------------- ✓ Postprocessing complete --------------")
@@ -72,6 +73,21 @@ def run_postprocess(session, probe_id=0, protocol=None):
     save_protocol_to_dict(protocol, profile.full_hash, session)
 
     return profile
+
+def run_widgets(session, probe_id=0, protocol=None, job_id=0, n_chunks=1):
+    
+    profile_cls = get_recording_profile(session, probe_id)
+    profile = profile_cls(session, probe_id, Path(PROTOCOLS_PATH) / protocol)
+
+    profile.load_metadata()
+    profile.load_protocol()
+    profile.prep_session_data()
+    
+    profile.post_widgets(job_id=job_id, n_chunks=n_chunks)
+    print(f"-------------- ✓ Plotting widgets --------------")
+
+    return profile
+
 
 def profile_to_mat(session, protocol=None):
     profile_cls = get_recording_profile(session, 0)
