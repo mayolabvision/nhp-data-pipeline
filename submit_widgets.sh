@@ -1,16 +1,16 @@
 #!/bin/bash -l
 #SBATCH --cluster=smp
-#SBATCH --partition=smp
+#SBATCH --partition=high-mem
 #SBATCH --job-name=widgets
 #SBATCH --error=/ix1/pmayo/outfiles/out_%A_%a.out 
 #SBATCH --output=/ix1/pmayo/outfiles/out_%A_%a.out
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=2
+#SBATCH --cpus-per-task=16
 #SBATCH --mail-type=fail
 #SBATCH --mail-user=knoneman@pitt.edu
 #SBATCH --time=0-02:59:59
-#SBATCH --array=0-49
+#SBATCH --array=0-1
 
 echo "My SLURM_ARRAY_JOB_ID is $SLURM_ARRAY_JOB_ID."
 echo "My SLURM_ARRAY_TASK_ID is $SLURM_ARRAY_TASK_ID"
@@ -28,8 +28,8 @@ source activate "$ENV_PATH"
 echo "======================================================"
 
 SESSION="${1}"
-PROBE_ID="${2:-0}"
-PROTOCOL="${3:-np-ks4}"
+PROTOCOL="${2:-np-ks4}"
+PROBE_ID=$SLURM_ARRAY_TASK_ID
 
 echo "SESSION    =  '$SESSION'"
 echo "PROBE_ID   =  $PROBE_ID"
@@ -49,8 +49,8 @@ run_widgets(
     '${SESSION}', 
     probe_id=int('$PROBE_ID'),
     protocol='${PROTOCOL}.json',
-    job_id=int('${SLURM_ARRAY_TASK_ID}'),
-    n_chunks=int('${SLURM_ARRAY_TASK_COUNT}')
+    job_id=int(0),
+    n_chunks=int(1)
 )"
 
 echo "======================================================"

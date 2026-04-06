@@ -273,3 +273,79 @@ def add_extension_arrays_to_metrics(extensions_path: Path, metrics: pd.DataFrame
 
     return metrics
 
+
+def select_sparse_contacts(recording, target_spacing_um=200, column="left"):
+    """
+    Select contacts from one probe column spaced ~target_spacing_um apart.
+
+    Parameters
+    ----------
+    recording : SpikeInterface Recording
+    target_spacing_um : float
+        Desired vertical spacing.
+    column : str
+        'left' or 'right'
+
+    Returns
+    -------
+    keep_channel_ids
+    remove_channel_ids
+    """
+
+    probe = recording.get_probe()
+    channel_ids = recording.channel_ids
+
+    positions = probe.contact_positions
+    xs = positions[:, 0]
+    ys = positions[:, 1]
+
+    # ---------------------------
+    # 1. Identify probe column
+    # ---------------------------
+    unique_x = np.unique(xs)
+
+    if len(unique_x) < 2:
+        raise ValueError("Probe does not appear to have multiple columns.")
+
+    left_x = np.min(unique_x)
+    right_x = np.max(unique_x)
+
+    if column == "left":
+        column_mask = np.isclose(xs, left_x)
+    elif column == "right":
+        column_mask = np.isclose(xs, right_x)
+    else:
+        raise ValueError("column must be 'left' or 'right'")
+
+    column_inds = np.where(column_mask)[0]
+
+    # ---------------------------
+    # 2. Sort vertically
+    # ---------------------------
+    sorted_inds = column_inds[np.argsort(ys[column_inds])]
+
+    sorted_y = ys[sorted_inds]
+
+    # ---------------------------
+    # 3. Select ~200 µm spacing
+    # ---------------------------
+    keep_inds = [sorted_inds[0]]
+    last_y = sorted_y[0]
+
+    for ind, y in zip(sorted_inds[1:], sorted_y[1:]):
+        if (y - last_y) >= target_spacing_um:
+            keep_inds.append(ind)
+            last_y = y
+
+    keep_inds = np.array(keep_inds)
+
+    # ---------------------------
+    # 4. Convert to channel IDs
+    # ---------------------------
+    keep_channel_ids = channel_ids[keep_inds]
+
+    remove_mask = np.ones(len(channel_ids), dtype=bool)
+    remove_mask[keep_inds] = False
+    remove_channel_ids = channel_ids[remove_mask]
+
+    return keep_channel_ids, remove_channel_ids

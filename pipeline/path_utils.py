@@ -35,6 +35,19 @@ def get_preprocess_hash(preprocessing_params: dict):
     
     return params_hash
 
+def get_sparse_hash(sparse_params: dict):
+    if not sparse_params:
+        return "notsparse"
+
+    # 1. Serialize the params with sorted keys for consistency
+    params_str = json.dumps(sparse_params, sort_keys=True)
+    
+    # 2. Hash the serialized string
+    params_hash = hashlib.md5(params_str.encode('utf-8')).hexdigest()
+    
+    return params_hash
+
+
 def get_motion_hash(motion_params: dict):
     # Handle empty motion_params
     if not motion_params:

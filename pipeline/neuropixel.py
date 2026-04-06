@@ -13,9 +13,9 @@ warnings.filterwarnings("ignore", category=pd.errors.SettingWithCopyWarning)
 
 from .base import RecordingProfile
 from config import RAW_DATA_PATH
-from .path_utils import get_preprocess_hash, get_motion_hash, get_trim_hash, save_params, get_sorter_hash
+from .path_utils import get_preprocess_hash, get_motion_hash, get_trim_hash, save_params, get_sorter_hash, get_sparse_hash
 from .si_tools import run_motion_correction, save_processed_recording, detect_motion_cutoffs, get_mean_waveforms
-from .si_tools import find_missing_extensions, add_extension_arrays_to_metrics
+from .si_tools import find_missing_extensions, add_extension_arrays_to_metrics, select_sparse_contacts
 from .si_plots import plot_probe_motion, plot_preprocessing_steps, plot_probe_peaks, plot_noise_levels, plot_motion_correction_traces, plot_analyzer_sess, plot_si_units, plot_ks_units
 from .ks_tools import convert_npy_to_mat, get_best_channels
 
@@ -34,9 +34,16 @@ set_global_job_kwargs(**global_job_kwargs)
 class NeuropixelProfile(RecordingProfile):
     def prep_session_data(self):
         self.data_path = Path(RAW_DATA_PATH) / self.session / f"{self.session}_{self.metadata['hardware_config'][self.probe_id]}"
+        
+        self.sparse_hash = get_sparse_hash(self.protocol["sparse"])    
       
         # preprocess/ preprocess hash / MC preprocess hash / MC hash
-        self.preprocess_hash = get_preprocess_hash(self.protocol["preprocessing"])    
+        if self.sparse_hash == "notsparse":
+            self.preprocess_hash = get_preprocess_hash(self.protocol["preprocessing"])    
+        else:
+            preprocess_hash = get_preprocess_hash(self.protocol["preprocessing"])    
+            self.preprocess_hash = preprocess_hash + self.sparse_hash
+ 
         self.pp_hash, self.motion_hash, self.pp_params, self.motion_params = get_motion_hash(self.protocol['motion_correction'])
         self.preprocess_path = self.data_path / "preprocess" / self.preprocess_hash / self.pp_hash / self.motion_hash
         save_params(self.preprocess_path.parent.parent / "params.json", self.protocol['preprocessing'])
@@ -54,6 +61,7 @@ class NeuropixelProfile(RecordingProfile):
 
         # sorting / preprocess + MC preprocess + MC + shake + trim + sorter hashes
         self.sorter_hash, self.sorter_params, _ = get_sorter_hash(self.protocol['sorting'])
+
         self.full_hash = "-".join([self.preprocess_hash, self.pp_hash, self.motion_hash, self.shake_hash, self.trim_hash, self.sorter_hash])
         self.sorter_path = self.data_path / "sorting" / self.full_hash
  
@@ -71,7 +79,13 @@ class NeuropixelProfile(RecordingProfile):
         
         print(f"Loading in raw data for applying preprocessing......................")
         stream_names, stream_ids = get_neo_streams('spikeglx', self.data_path)
-        raw_recording = read_spikeglx(self.data_path, stream_name=f'imec{self.probe_id}.ap', load_sync_channel=False)
+        recording = read_spikeglx(self.data_path, stream_name=f'imec{self.probe_id}.ap', load_sync_channel=False)
+
+        if self.protocol.get('sparse'):
+            keep_ids, remove_ids = select_sparse_contacts(recording, **self.protocol["sparse"])
+            raw_recording = recording.remove_channels(remove_ids)
+        else:
+            raw_recording = recording
             
         print("--------------------- RAW RECORDING -----------------------------")
         print("Sampling frequency:", raw_recording.get_sampling_frequency())
@@ -245,7 +259,7 @@ class NeuropixelProfile(RecordingProfile):
         print(f"Loading in sorting analyzer......................")
         analyzer = load_sorting_analyzer(self.analyzer_path)
 
-        if not (Path(self.metrics_path) / "cluster_metrics666.csv").is_file(): 
+        if not (Path(self.metrics_path) / "cluster_metrics.csv").is_file(): 
             print(f"Computing quality metrics......................")
             metrics = compute_quality_metrics(
                     analyzer,
@@ -288,7 +302,7 @@ class NeuropixelProfile(RecordingProfile):
             print("cluster_metrics already exists, loading in df")
 
         print(f"Plotting analyzer summary and metrics......................")
-        if not (Path(self.figs_path) / "analyzer_summary666.png").is_file(): 
+        if not (Path(self.figs_path) / "analyzer_summary.png").is_file(): 
             plot_analyzer_sess(analyzer, metrics, self) 
             print(f"===== analyzer session summary plotted =====")
         
@@ -302,7 +316,8 @@ class NeuropixelProfile(RecordingProfile):
         metrics = pd.read_csv(Path(self.metrics_path) / "cluster_metrics.csv")      
 
         print(f"Loading in sorting analyzer......................")
-        analyzer = load_sorting_analyzer(self.analyzer_path)
+        analyzer = load_sorting_analyzer(self.analyzer_path, 
+                                         load_extensions=True, format="binary_folder")
 
         os.makedirs(Path(self.figs_path) / "clusters", exist_ok=True)
         

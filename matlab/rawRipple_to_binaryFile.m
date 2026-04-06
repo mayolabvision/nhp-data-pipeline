@@ -30,7 +30,7 @@ function rawRipple_to_binaryFile(data_path,probes_path,probe_index)
 json_text = fileread(fullfile(data_path,'metadata.json'));
 metadata = jsondecode(json_text);
 
-if ~isequal(metadata.probe_type{probe_index},'plexon')
+if probe_index > numel(metadata.probe_type) || ~isequal(metadata.probe_type{probe_index}, 'plexon')
     return
 end
 
@@ -75,7 +75,8 @@ for i = 1:numel(nevnames)
     end
 end
 
-ns5_tasks = cell(sum(cellfun(@(q) ~any(contains(q,{'fstm','fast'})), nevnames, 'uni', 1)),1);
+%ns5_tasks = cell(sum(cellfun(@(q) ~any(contains(q,{'fstm','fast'})), nevnames, 'uni', 1)),1);
+task_cnt = 1;
 for nevnum = 1:length(nevnames)
     nevpath = nevpaths{nevnum};
     this_task = tasks{nevnum};
@@ -103,29 +104,26 @@ for nevnum = 1:length(nevnames)
             % Channels x samples
             this_ns5 = out_ns5.data(chan_inds,:);
 
-            % Save each task as samples x channels 
-            ns5_tasks{nevnum} = this_ns5';
+            % Saving data to binary file
+            full_bin_path = fullfile(data_path, [metadata.sess_name, '_', hw_config], sprintf('raw_%d.bin',task_cnt)); 
+            if ~exist(fileparts(full_bin_path),'dir'), mkdir(fileparts(full_bin_path)); end
+            fid_data = fopen(full_bin_path, 'w'); % Open file in append mode ('a')
+            fwrite(fid_data, this_ns5, 'int16');
+            fclose(fid_data);
+           
+            task_cnt = task_cnt + 1;             
         else
             fprintf('\n---- no raw signal for %s ----\n', this_task);
-            return
         end
     end
 end
 
 % Samples x Channels (across all tasks)
-ns5_data = vertcat(ns5_tasks{:});
-
-% Saving data to binary file
-full_bin_path = fullfile(data_path, [metadata.sess_name, '_', hw_config], 'raw_signal.bin'); 
-if ~exist(fileparts(full_bin_path),'dir'), mkdir(fileparts(full_bin_path)); end
-fid_data = fopen(full_bin_path, 'wb'); % Open file in append mode ('a')
-fwrite(fid_data, ns5_data, 'int16');
-fclose(fid_data);
+%ns5_data = vertcat(ns5_tasks{:});
 
 % Storing important parameters to json
 ripple_info = struct();
 ripple_info.Fs = double(out_ns5.hdr.Fs);
-ripple_info.num_samples = size(ns5_data,1);
 ripple_info.num_channels = size(ns5_data,2);
 ripple_info.dtype_matlab = 'int16';
 ripple_info.dtype_python = 'int16';

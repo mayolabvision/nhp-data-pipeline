@@ -54,6 +54,8 @@ if any(contains(taskName, {'rfmp', 'rfMapping'}))
 
 %---------------------------------------- dirmem_withhelp ----------------------------------------% 
 elseif any(contains(taskName, {'mdir', 'dirmem'}))
+    if ~iscell(tbl.FIX_OFF), tbl.FIX_OFF = num2cell(tbl.FIX_OFF); end
+ 
     tbl = expandConditionText(tbl);
     tbl.eyePos = eyePos; tbl.eyeVel = eyeVel; tbl.eyeAcc = eyeAcc;
     
