@@ -50,7 +50,7 @@ S1 = struct();
 S1.sess_name = metadata.sess_name;
 S1.metadata = metadata;
 
-if BEHAV_ONLY
+if BEHAV_ONLY | isempty(metadata.probe_type)
     NET_PATH = [];
     SORTER_PATH = [];
     metadata.probe_type = 'behavior';

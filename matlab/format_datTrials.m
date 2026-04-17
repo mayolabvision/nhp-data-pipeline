@@ -223,7 +223,7 @@ function [dat, epochEnd, tempdata, channels] = format_datTrials(nev, out_ns5, va
                 end
             end
 
-            dat(n).ns5_samps = ns5_rng([trialstarts_samp(n),trialends_samp(n)]);
+            %dat(n).ns5_samps = ns5_rng([trialstarts_samp(n),trialends_samp(n)]);
 
             % Extract and process eye data
             if ~isempty(eye_channel_labels)

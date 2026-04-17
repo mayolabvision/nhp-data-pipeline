@@ -24,9 +24,9 @@ class BehaviorProfile(RecordingProfile):
     def preprocessing(self):
         pass
     
-    def motion_rejection(self):
+    def shake_trimming(self):
         pass
-
+ 
     def spike_sorting(self):
         pass
 
@@ -35,3 +35,7 @@ class BehaviorProfile(RecordingProfile):
 
     def quality_metrics(self):
         pass
+
+    def post_widgets(self):
+        pass
+
