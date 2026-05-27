@@ -147,4 +147,4 @@ sbatch submit_matlabTbl.sh <SESSION> <PROTOCOL>
 
 ## Questions?
 
-For questions about this pipeline, contact **Kendra Noneman** — kendra.noneman@gmail.com
+For questions about this pipeline, contact **Kendra Noneman** — knoneman@andrew.cmu.edu
