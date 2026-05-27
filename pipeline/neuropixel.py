@@ -194,7 +194,22 @@ class NeuropixelProfile(RecordingProfile):
             if not (Path(self.figs_path) / "probe_motion_cutoff.png").is_file(): 
                 plot_probe_motion(self)
                 print(f"===== probe motion w/ cutoff plotted =====")
-        
+     
+        if custom_sorter_params['whitening_range']==666:
+            prb = recording.get_probe().to_dataframe()
+            yp = np.diff(prb.y.values)
+            ypitch = yp[yp>0].min()
+
+            if ypitch==20:
+                custom_sorter_params['nearest_chans'] = 15
+                custom_sorter_params['whitening_range'] = 15
+            elif ypitch==40:
+                custom_sorter_params['nearest_chans'] = 9
+                custom_sorter_params['whitening_range'] = 9
+            else: # set to defaults
+                custom_sorter_params['nearest_chans'] = 10
+                custom_sorter_params['whitening_range'] = 32
+   
         print("--------------------------------------------------")
         print(custom_sorter_params)
         print("--------------------------------------------------")
