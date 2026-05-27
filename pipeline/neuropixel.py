@@ -195,17 +195,18 @@ class NeuropixelProfile(RecordingProfile):
                 plot_probe_motion(self)
                 print(f"===== probe motion w/ cutoff plotted =====")
      
-        if custom_sorter_params['whitening_range']==666:
+        if custom_sorter_params.get('whitening_range') == 666 or custom_sorter_params.get('nearest_chans') == 666:
             prb = recording.get_probe().to_dataframe()
             yp = np.diff(prb.y.values)
             ypitch = yp[yp>0].min()
 
+            # set params so 110um spatial search 
             if ypitch==20:
-                custom_sorter_params['nearest_chans'] = 15
-                custom_sorter_params['whitening_range'] = 15
+                custom_sorter_params['nearest_chans'] = 16
+                custom_sorter_params['whitening_range'] = 16
             elif ypitch==40:
-                custom_sorter_params['nearest_chans'] = 9
-                custom_sorter_params['whitening_range'] = 9
+                custom_sorter_params['nearest_chans'] = 8
+                custom_sorter_params['whitening_range'] = 8
             else: # set to defaults
                 custom_sorter_params['nearest_chans'] = 10
                 custom_sorter_params['whitening_range'] = 32
