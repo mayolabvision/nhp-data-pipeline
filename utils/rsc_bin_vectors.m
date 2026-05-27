@@ -1,4 +1,4 @@
-function [x,y,c] = rsc_bin_vectors(Rtbl,Tclust,binID)
+function [x,y,c1,c2] = rsc_bin_vectors(Rtbl,Tclust,binID)
 
 % attach binIDs to cluster table
 Tclust.binID = binID;
@@ -17,6 +17,9 @@ x = Tclust.binID(loc1);
 y = Tclust.binID(loc2);
 
 % rsc values
-c = vertcat(Rtbl.rsc{:});
+c1 = vertcat(Rtbl.rsc{:});
+
+% rsc values
+c2 = vertcat(Rtbl.rsig{:});
 
 end
