@@ -139,8 +139,9 @@ sbatch submit_matlabTbl.sh <SESSION> <PROTOCOL>
 
 - Automated pipeline chaining (submit full workflow as a DAG with SLURM dependencies)
 - Drift-corrected LFP extraction for Neuropixel recordings
-- Cross-session unit tracking
-- Support for additional sorters (e.g., MountainSort5, Tridesclous2)
+- More thorough debugging jupyter notebook
+- Full installation/debugging tutorials
+- "Quick" versions of the pipeline for behavior only 
 - Improved probe geometry tooling for custom FHC array configurations
 
 ---
