@@ -439,7 +439,8 @@ S = unify_taskTables(S1,taskTypes);
 if ~exist(fullfile(OUT_PATH, session_name, 'tables'), 'dir'), mkdir(fullfile(OUT_PATH, session_name, 'tables')); end 
 
 if SORTER_PATH
-    save(fullfile(OUT_PATH,session_name,'tables',sprintf('%s-%s.mat',session_name,SORTER_PATH)), 'S', '-v7.3');
+    short_id = shorten_sorter_path(SORTER_PATH, fullfile(OUT_PATH, session_name, 'tables'));
+    save(fullfile(OUT_PATH, session_name, 'tables', sprintf('%s-%s.mat', session_name, short_id)), 'S', '-v7.3');
 else
     if NET_PATH
         save(fullfile(OUT_PATH,session_name,'tables',sprintf('%s-nasnet.mat',session_name)), 'S', '-v7.3');

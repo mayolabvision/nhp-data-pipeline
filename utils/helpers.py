@@ -2,7 +2,115 @@ from pathlib import Path
 import json
 import os
 import shutil
+import hashlib
 from spikeinterface.sorters import get_default_sorter_params
+
+
+def shorten_filename(filepath, key_file=None):
+    """
+    Shorten a filepath whose name exceeds OS limits by hashing the long suffix
+    after a fixed prefix (everything up to and including the first '-').
+
+    The prefix is preserved verbatim; the remainder is replaced with the first
+    16 hex chars of its SHA-256 digest. A JSON key file records the mapping so
+    the original suffix can always be recovered.
+
+    Args:
+        filepath (str | Path): Full path to the file (need not exist yet).
+        key_file (str | Path | None): Path to the JSON key file. Defaults to
+            a file named 'filename_key.json' in the same directory.
+
+    Returns:
+        Path: The shortened path.
+    """
+    filepath = Path(filepath)
+    parent = filepath.parent
+    name = filepath.name
+
+    # Split on the first '-' to isolate the fixed prefix
+    split = name.split('-', 1)
+    if len(split) == 1:
+        return filepath  # nothing to shorten
+
+    prefix, suffix_with_ext = split[0], split[1]
+
+    # Separate the file extension from the suffix
+    dot_idx = suffix_with_ext.rfind('.')
+    if dot_idx != -1:
+        long_suffix = suffix_with_ext[:dot_idx]
+        ext = suffix_with_ext[dot_idx:]
+    else:
+        long_suffix = suffix_with_ext
+        ext = ''
+
+    short_hash = hashlib.sha256(long_suffix.encode()).hexdigest()[:16]
+    short_name = f"{prefix}-{short_hash}{ext}"
+    short_path = parent / short_name
+
+    if key_file is None:
+        key_file = parent / 'filename_key.json'
+    key_file = Path(key_file)
+
+    # Load existing key file or start fresh
+    if key_file.exists():
+        with open(key_file, 'r') as f:
+            key_map = json.load(f)
+    else:
+        key_map = {}
+
+    if short_hash not in key_map:
+        key_map[short_hash] = long_suffix
+        with open(key_file, 'w') as f:
+            json.dump(key_map, f, indent=2)
+
+    return short_path
+
+
+def restore_filename(short_path, key_file=None):
+    """
+    Reverse shorten_filename: look up the short hash in the key file and
+    return the original full path.
+
+    Args:
+        short_path (str | Path): The shortened path returned by shorten_filename.
+        key_file (str | Path | None): Path to the JSON key file. Defaults to
+            'filename_key.json' in the same directory as short_path.
+
+    Returns:
+        Path: The original path, or short_path unchanged if not found.
+    """
+    short_path = Path(short_path)
+    parent = short_path.parent
+    name = short_path.name
+
+    split = name.split('-', 1)
+    if len(split) == 1:
+        return short_path
+
+    prefix, hash_with_ext = split[0], split[1]
+    dot_idx = hash_with_ext.rfind('.')
+    if dot_idx != -1:
+        short_hash = hash_with_ext[:dot_idx]
+        ext = hash_with_ext[dot_idx:]
+    else:
+        short_hash = hash_with_ext
+        ext = ''
+
+    if key_file is None:
+        key_file = parent / 'filename_key.json'
+    key_file = Path(key_file)
+
+    if not key_file.exists():
+        return short_path
+
+    with open(key_file, 'r') as f:
+        key_map = json.load(f)
+
+    if short_hash not in key_map:
+        return short_path
+
+    original_name = f"{prefix}-{key_map[short_hash]}{ext}"
+    return parent / original_name
 
 def make_output_structure(session, protocol, probe_id=0, raw_data_path='/ix1/pmayo/lab_NHPdata'):
     
