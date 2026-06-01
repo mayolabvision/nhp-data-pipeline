@@ -23,7 +23,7 @@ source activate "$ENV_PATH"
 echo "======================================================"
 
 SESSION="${1}"
-PROTOCOL="${2:-np-ks4}"
+PROTOCOL="${2:-np_med-ks4}"
 
 echo "SESSION    =  '$SESSION'"
 echo "PROTOCOL   =  $PROTOCOL"
