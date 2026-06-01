@@ -182,6 +182,10 @@ class NeuropixelProfile(RecordingProfile):
         print(f"===================================================================")
         
     def spike_sorting(self):
+        # Temporary deleting of sorting results to make changes
+        #if self.sorter_path.exists():
+        #    shutil.rmtree(self.sorter_path)
+
         print(f"Loading in preprocessed recording......................")
         recording = load(self.preprocess_path / 'output')
         _, _, custom_sorter_params = get_sorter_hash(self.protocol['sorting'])
@@ -197,8 +201,11 @@ class NeuropixelProfile(RecordingProfile):
      
         if custom_sorter_params.get('whitening_range') == 666 or custom_sorter_params.get('nearest_chans') == 666:
             prb = recording.get_probe().to_dataframe()
+            prb = prb.sort_values('y')
             yp = np.diff(prb.y.values)
             ypitch = yp[yp>0].min()
+
+            print(f"ypitch = {ypitch}")
 
             # set params so 110um spatial search 
             if ypitch==20:
@@ -208,8 +215,8 @@ class NeuropixelProfile(RecordingProfile):
                 custom_sorter_params['nearest_chans'] = 8
                 custom_sorter_params['whitening_range'] = 8
             else: # set to defaults
-                custom_sorter_params['nearest_chans'] = 10
-                custom_sorter_params['whitening_range'] = 32
+                custom_sorter_params['nearest_chans'] = 16
+                custom_sorter_params['whitening_range'] = 16
    
         print("--------------------------------------------------")
         print(custom_sorter_params)
