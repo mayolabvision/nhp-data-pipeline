@@ -14,7 +14,7 @@ warnings.filterwarnings("ignore", category=pd.errors.SettingWithCopyWarning)
 from .base import RecordingProfile
 from config import RAW_DATA_PATH
 from .path_utils import get_preprocess_hash, get_motion_hash, get_trim_hash, save_params, get_sorter_hash, get_sparse_hash
-from .si_tools import run_motion_correction, save_processed_recording, detect_motion_cutoffs, get_mean_waveforms
+from .si_tools import run_motion_correction, save_processed_recording, detect_motion_cutoffs, get_mean_waveforms, get_mean_templates
 from .si_tools import find_missing_extensions, add_extension_arrays_to_metrics, select_sparse_contacts
 from .si_plots import plot_probe_motion, plot_preprocessing_steps, plot_probe_peaks, plot_noise_levels, plot_motion_correction_traces, plot_analyzer_sess, plot_si_units, plot_ks_units
 from .ks_tools import convert_npy_to_mat, get_best_channels
@@ -315,7 +315,13 @@ class NeuropixelProfile(RecordingProfile):
                 mean_wfs.get(unit_id, np.array([]))
                 for unit_id in metrics['cluster_id']
             ]
-            print("✓ Waveforms for each unit pulled.")
+
+            mean_tmpls = get_mean_templates(analyzer)
+            metrics['mean_template'] = [
+                mean_tmpls.get(unit_id, np.array([]))
+                for unit_id in metrics['cluster_id']
+            ]
+            print("✓ Waveforms and templates for each unit pulled.")
 
             save_params(self.metrics_path / "params.json", self.protocol['quality_metrics'])
             metrics.to_csv(self.metrics_path / 'cluster_metrics.csv', index=False)

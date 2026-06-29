@@ -196,36 +196,45 @@ def save_processed_recording(recording, preprocess_path):
 
 def get_mean_waveforms(analyzer):
     """
-    Returns mean waveform on the best channel for each unit.
+    Returns mean waveform on the best (first sparse) channel for each unit.
     Output shape per unit: (n_samples,)
     """
     wf_ext = analyzer.get_extension("waveforms")
     mean_wfs = {}
 
     for unit_id in analyzer.unit_ids:
+        # get_waveforms_one_unit already slices to sparse channels,
+        # so axis-2 index 0 is the best channel (first in sparsity order)
         wfs = wf_ext.get_waveforms_one_unit(unit_id)  # (n_spikes, n_samples, n_channels_sparse)
 
         if wfs is None or wfs.shape[0] == 0:
             mean_wfs[unit_id] = np.array([])
             continue
 
-        unit_index = list(analyzer.unit_ids).index(unit_id)
-
-        # global channel indices for this unit
-        chan_inds_global = np.where(analyzer.sparsity.mask[unit_index])[0]
-
-        # best channel (global index)
-        best_chan_global = chan_inds_global[0]
-
-        # 🔑 convert to LOCAL index
-        best_chan_local = np.where(chan_inds_global == best_chan_global)[0][0]
-
-        # extract waveform
-        wfs_best = wfs[:, :, best_chan_local]  # (n_spikes, n_samples)
-
-        mean_wfs[unit_id] = wfs_best.mean(axis=0)
+        mean_wfs[unit_id] = wfs[:, :, 0].mean(axis=0)
 
     return mean_wfs
+
+
+def get_mean_templates(analyzer, operator="average"):
+    """
+    Returns the mean template on the best (first sparse) channel for each unit.
+    Output shape per unit: (n_samples,)
+    """
+    tmpl_ext = analyzer.get_extension("templates")
+    mean_tmpls = {}
+
+    for unit_id in analyzer.unit_ids:
+        # get_unit_template returns (n_samples, n_channels) on sparse channels
+        tmpl = tmpl_ext.get_unit_template(unit_id, operator=operator)
+
+        if tmpl is None or tmpl.shape[0] == 0:
+            mean_tmpls[unit_id] = np.array([])
+            continue
+
+        mean_tmpls[unit_id] = tmpl[:, 0]
+
+    return mean_tmpls
 
 ######################################################################################################
 
