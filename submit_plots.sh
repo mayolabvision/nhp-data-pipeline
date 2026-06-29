@@ -44,20 +44,21 @@ echo "======================================================"
 ################### RUN SI to get PROFILE #######################
 
 echo "Retrieving protocol path........................"
-SORTER_PATH=$($CONDA_PREFIX/bin/python -c "
+RESULT=$($CONDA_PREFIX/bin/python -c "
 from main_pipeline import profile_to_mat
 
-print(profile_to_mat(
-    '${SESSION}', 
-    protocol='${PROTOCOL}.json' 
-))
+sorter_path, short_path = profile_to_mat('${SESSION}', protocol='${PROTOCOL}.json')
+print(sorter_path, short_path)
 ")
 
-echo "SORTER_PATH    =  '$SORTER_PATH'"
+SORTER_PATH=$(echo "$RESULT" | awk '{print $1}')
+SHORT_PATH=$(echo "$RESULT" | awk '{print $2}')
+
+echo "SORTER_PATH = '$SORTER_PATH'"
+echo "SHORT_PATH  = '$SHORT_PATH'"
 echo "======================================================"
 
-#DATA_PATH="${RAW_DATA_PATH}/${SESSION}/tables/${SESSION}-${PROTOCOL}.mat"
-DATA_PATH="${RAW_DATA_PATH}/${SESSION}/tables/${SESSION}-${SORTER_PATH}.mat"
+DATA_PATH="${RAW_DATA_PATH}/${SESSION}/tables/${SESSION}-${SHORT_PATH}.mat"
 FIG_PATH="${RAW_DATA_PATH}/${SESSION}/figs/${SORTER_PATH}/"
 
 echo "DATA_PATH: $DATA_PATH"

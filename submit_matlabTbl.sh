@@ -34,17 +34,17 @@ echo "======================================================"
 ################### RUN SI to get PROFILE #######################
 
 echo "Retrieving protocol path........................"
-SORTER_PATH=$($CONDA_PREFIX/bin/python -c "
+RESULT=$($CONDA_PREFIX/bin/python -c "
 from main_pipeline import profile_to_mat
 
-print(profile_to_mat(
-    '${SESSION}', 
-    protocol='${PROTOCOL}.json' 
-))
+sorter_path, short_path = profile_to_mat('${SESSION}', protocol='${PROTOCOL}.json')
+print(sorter_path, short_path)
 ")
 
-echo "SORTER_PATH    =  '$SORTER_PATH'"
-echo "======================================================"
+SORTER_PATH=$(echo "$RESULT" | awk '{print $1}')
+SHORT_PATH=$(echo "$RESULT" | awk '{print $2}')
+
+echo "SORTER_PATH = '$SORTER_PATH'"
 
 #################################################################
 ################### RUN MATLAB SCRIPT #######################
@@ -70,5 +70,3 @@ exit
 EOF
 
 #################################################################
-echo "DONE"
-crc-job-stats

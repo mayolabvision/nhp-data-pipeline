@@ -5,7 +5,6 @@ import shutil
 import hashlib
 from spikeinterface.sorters import get_default_sorter_params
 
-
 def shorten_filename(filepath, key_file=None):
     """
     Shorten a filepath whose name exceeds OS limits by hashing the long suffix
@@ -245,3 +244,21 @@ def write_recording_details(rec, save_path):
         file.write(f'Number of samples: {num_samples}\n')
         file.write(f'Total time: {total_time} seconds\n')
         file.write(f'Data type: {dtype}\n')
+
+def shorten_sorter_path(sorter_path: str, key_dir: str | Path | None = None) -> str:
+    if key_dir is None:
+        key_dir = Path.cwd()
+    key_dir = Path(key_dir)
+
+    short_id = hashlib.sha256(sorter_path.encode()).hexdigest()[:16]
+
+    key_file = key_dir / "sorter_path_key.json"
+    key_map = json.loads(key_file.read_text()) if key_file.exists() else {}
+
+    field = f"id_{short_id}"
+    if field not in key_map:
+        key_map[field] = sorter_path
+        key_file.write_text(json.dumps(key_map, indent=2))
+
+    return short_id
+

@@ -210,10 +210,10 @@ class NeuropixelProfile(RecordingProfile):
             # set params so 110um spatial search 
             if ypitch==20:
                 custom_sorter_params['nearest_chans'] = 16
-                custom_sorter_params['whitening_range'] = 16
+                custom_sorter_params['whitening_range'] = 30
             elif ypitch==40:
                 custom_sorter_params['nearest_chans'] = 8
-                custom_sorter_params['whitening_range'] = 8
+                custom_sorter_params['whitening_range'] = 16
             else: # set to defaults
                 custom_sorter_params['nearest_chans'] = 16
                 custom_sorter_params['whitening_range'] = 16
