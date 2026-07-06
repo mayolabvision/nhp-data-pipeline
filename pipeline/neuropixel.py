@@ -282,7 +282,7 @@ class NeuropixelProfile(RecordingProfile):
         print(f"Loading in sorting analyzer......................")
         analyzer = load_sorting_analyzer(self.analyzer_path)
 
-        if not (Path(self.metrics_path) / "cluster_metrics.csv").is_file(): 
+        if not (Path(self.metrics_path) / "cluster_metrics666.csv").is_file(): 
             print(f"Computing quality metrics......................")
             metrics = compute_quality_metrics(
                     analyzer,
