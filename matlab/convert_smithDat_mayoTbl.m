@@ -52,9 +52,10 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
     p = inputParser;
     addRequired(p, 'dat', @isstruct);
     addRequired(p, 'dat_iti', @isstruct);
-    addParameter(p, 'TASK_NAME', [], @ischar)
+    addParameter(p, 'TASK_NAME', [], @ischar);
     addParameter(p, 'LFP', []);
-    addParameter(p, 'HELPERS_PATH', defaultHELP_PATH, @ischar)
+    addParameter(p, 'HELPERS_PATH', defaultHELP_PATH, @ischar);
+    addParameter(p, 'INCLUDE_ITI', true, @islogical);
 
     % Parse the inputs
     parse(p, dat, dat_iti, varargin{:});
@@ -65,6 +66,7 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
     TASK_NAME = p.Results.TASK_NAME;
     LFP = p.Results.LFP;
     HELPERS_PATH = p.Results.HELPERS_PATH;
+    INCLUDE_ITI = p.Results.INCLUDE_ITI;
 
     addpath(fullfile(HELPERS_PATH,'behavior'));
 
@@ -121,6 +123,12 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
         end
     end
 
+    tbl.text = tbl1.text;
+    tbl.text(tbl.result=='NaN') = {''};
+
+    tbl.params = tbl1.params;
+    tbl.eyedata = tbl1.eyedata; tbl.pupil = tbl1.pupil; tbl.diode = tbl1.diode;
+
     names = string(tbl.trialName);
     itiRows = find(contains(names, '.iti.'));
     for i = 1:numel(itiRows)
@@ -129,20 +137,14 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
         tbl.ALIGN_PULSE(r) = cellfun(@(q) q - (tbl.END_TRIAL(names==trlName)+1), tbl.ALIGN_PULSE(names==trlName), 'uni', 0);
     end
 
-    tbl.text = tbl1.text;
-    tbl.text(tbl.result=='NaN') = {''};
-
-    tbl.params = tbl1.params;
-    tbl.eyedata = tbl1.eyedata; tbl.pupil = tbl1.pupil; tbl.diode = tbl1.diode;
-
     [~, idx] = sort(tbl.time_sec(:,1));
     tbl = tbl(idx,:);
 
-    %try
-    [~, tbl] = handle_taskSpecifics(tbl, TASK_NAME);
-    %catch
-    %    disp('------------- task-specific additions failed -------------');
-    %end
+    try
+        [~, tbl] = handle_taskSpecifics(tbl, TASK_NAME);
+    catch
+        disp('------------- task-specific additions failed -------------');
+    end
 
     %tbl.ns5_samps = tbl1.ns5_samps;
 
@@ -167,6 +169,10 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
 
     if ~isempty(LFP)
         tbl.lfp = LFP;
+    end
+
+    if ~INCLUDE_ITI
+        tbl(contains(tbl.trialName, '.iti.'), :) = []; 
     end
 
 
