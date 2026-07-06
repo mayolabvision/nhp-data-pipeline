@@ -1,4 +1,4 @@
-function tbl = convert_smithDat_mayoTbl(dat,varargin)
+function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
     % format_dataTable - Processes neural and behavioral data from nev and ns5 files into a structured table.
     %
     % This function processes and formats data from neural and behavioral recording files. It takes in 
@@ -50,16 +50,18 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
 
     % Create an input parser
     p = inputParser;
-    addRequired(p, 'dat', @(x) (isnumeric(x)) || isstruct(x));
+    addRequired(p, 'dat', @isstruct);
+    addRequired(p, 'dat_iti', @isstruct);
     addParameter(p, 'TASK_NAME', [], @ischar)
     addParameter(p, 'LFP', []);
     addParameter(p, 'HELPERS_PATH', defaultHELP_PATH, @ischar)
 
     % Parse the inputs
-    parse(p, dat, varargin{:});
+    parse(p, dat, dat_iti, varargin{:});
 
     % Assign parsed values to variables
     dat = p.Results.dat;
+    dat_iti = p.Results.dat_iti;
     TASK_NAME = p.Results.TASK_NAME;
     LFP = p.Results.LFP;
     HELPERS_PATH = p.Results.HELPERS_PATH;
@@ -75,12 +77,15 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
         end
     end
 
-    tbl1 = struct2table(dat);
-    tbl = table();
+    tbl1 = struct2table(dat); tbl2 = struct2table(dat_iti);
+    tbl = table(); 
 
-    % re-arranging table to be easier to access data 
-    tbl.trialName = cellfun(@(q) [TASK_NAME, '.', sprintf('%04d', q)], num2cell(1:height(tbl1))', 'uni', 0);
+    % trial names, trl = within-trial and iti = inter-trial
+    tbl.trialName = [cellfun(@(q) [TASK_NAME, '.trl.', sprintf('%04d', q)], num2cell(1:height(tbl1))', 'uni', 0); cellfun(@(q) [TASK_NAME, '.iti.', sprintf('%04d', q)], num2cell(1:height(tbl2))', 'uni', 0)];
     tbl.trialName = categorical(string(tbl.trialName));
+
+    tbl1 = [tbl1; tbl2];
+
     if ismember('block', tbl1.Properties.VariableNames), tbl.block = tbl1.block; end
     if ismember('time', tbl1.Properties.VariableNames), tbl.time_sec = tbl1.time; end
 
@@ -90,6 +95,7 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
         tbl.result = convertBetween_eventCodes_eventNames(num2cell(tbl1.result));
     end
     tbl.result = categorical(string(tbl.result));
+    tbl.result(tbl.result=='ALIGN_PULSE') = categorical("NaN");
 
     % Make array of times of start/end time per trial, for aligning with trial codes and indexing eye data
     times_ms = cellfun(@(q) round(q(1)*1000:(q(2)+1)*1000), num2cell(tbl1.time,2), 'uni', 0);
@@ -115,9 +121,22 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
         end
     end
 
+    names = string(tbl.trialName);
+    itiRows = find(contains(names, '.iti.'));
+    for i = 1:numel(itiRows)
+        r = itiRows(i);
+        trlName = strrep(names(r), '.iti.', '.trl.');
+        tbl.ALIGN_PULSE(r) = cellfun(@(q) q - (tbl.END_TRIAL(names==trlName)+1), tbl.ALIGN_PULSE(names==trlName), 'uni', 0);
+    end
+
     tbl.text = tbl1.text;
+    tbl.text(tbl.result=='NaN') = {''};
+
     tbl.params = tbl1.params;
     tbl.eyedata = tbl1.eyedata; tbl.pupil = tbl1.pupil; tbl.diode = tbl1.diode;
+
+    [~, idx] = sort(tbl.time_sec(:,1));
+    tbl = tbl(idx,:);
 
     %try
     [~, tbl] = handle_taskSpecifics(tbl, TASK_NAME);
@@ -127,7 +146,7 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
 
     %tbl.ns5_samps = tbl1.ns5_samps;
 
-    %% Add spiking data if nasnet was used 
+    % Add spiking data if nasnet was used 
     % Find all variable names in tbl1 that start with 'spiketimes_'
     spike_vars = tbl1.Properties.VariableNames(startsWith(tbl1.Properties.VariableNames, 'spiketimes_'));
     
@@ -149,5 +168,6 @@ function tbl = convert_smithDat_mayoTbl(dat,varargin)
     if ~isempty(LFP)
         tbl.lfp = LFP;
     end
+
 
 end

@@ -1,4 +1,4 @@
-function [dat, epochEnd, tempdata, channels] = format_datTrials(nev, out_ns5, varargin)
+function [dat, dat_iti, epochEnd, tempdata, channels] = format_datTrials(nev, out_ns5, varargin)
     % format_datTrials - Processes neural and behavioral data for multiple trials, 
     % extracts eye and spike data, and formats the information into a structured array.
     %
@@ -93,7 +93,7 @@ function [dat, epochEnd, tempdata, channels] = format_datTrials(nev, out_ns5, va
         spike_sort = false; % No spike sorting if nev is not a struct
     end
     
-    dat_all = []; % Initialize output structure array
+    dat_all = []; dat_iti_all = []; % Initialize output structure arrays
     past_epochEnd = 0; % Keep track of the end of the previous epoch
     block = 1; % Block number for trial grouping
     
@@ -157,7 +157,7 @@ function [dat, epochEnd, tempdata, channels] = format_datTrials(nev, out_ns5, va
         end
             
         if ~isempty(eye_channel_labels)
-            dat = repmat(struct(...
+            [dat,dat_iti] = deal(repmat(struct(...
                 'block', [], ...
                 'channels', [], ...
                 'time', [], ...
@@ -167,18 +167,20 @@ function [dat, epochEnd, tempdata, channels] = format_datTrials(nev, out_ns5, va
                 'params', struct(), ...
                 'eyedata', [], ...
                 'pupil', [], ...
-                'diode', []), length(trialstarts), 1);
+                'diode', []), length(trialstarts), 1));
            
         else
-            dat = repmat(struct(...
+            [dat,dat_iti] = deal(repmat(struct(...
             'block', [], ...
             'channels', [], ...
             'time', [], ...
             'text', '', ...
             'trialcodes', [], ...
             'result', NaN, ...
-            'params', struct()), length(trialstarts), 1);
+            'params', struct()), length(trialstarts), 1));
         end
+
+        %dat_iti(end) = [];
 
         %% Loop through trials and organize data
         for n = 1:length(trialstarts)
@@ -263,13 +265,70 @@ function [dat, epochEnd, tempdata, channels] = format_datTrials(nev, out_ns5, va
                     dat(n).(sprintf('netlabels_%d', probe_index)) = netLabels_byUnit; % Store spike sorting labels
                 end
             end
+
+            % INTERTRIAL-INTERVALS
+            if n < numel(trialstarts)
+                dat_iti(n).block = block;
+                dat_iti(n).channels = channels;
+                dat_iti(n).time = [trialends(n)+(1/Fs) trialstarts(n+1)-(1/Fs)]; % Store trial start and end times
+                dat_iti(n).text = dat(n).text;
+                this_trial = this_nev(trialendinds(n)+1:trialstartinds(n+1)-1, :);
+                dat_iti(n).trialcodes = [0, 1, trialends(n)+(1/Fs); 0, 255, trialstarts(n+1)-(1/Fs)];
+                dat_iti(n).result = NaN;
+                dat_iti(n).params.block = dat(n).params.block;
+    
+                % Extract and process eye data
+                if ~isempty(eye_channel_labels)
+                    eyes = out_ns5.data(eye_channels, ns5_rng(trialends_samp(n)+1:trialstarts_samp(n+1)-1));
+                    eyes_1khz = downsample(eyes', 30)'; % Downsample to 1 kHz
+                    [eyedeg, ~] = eye2deg(eyes_1khz(1:2, :), dat(n).params); % Convert to degrees
+                    dat_iti(n).eyedata = eyedeg;
+    
+                    if ~isempty(pupil_channel)
+                        pupil = out_ns5.data(pupil_channel, ns5_rng(trialends_samp(n)+1:trialstarts_samp(n+1)-1));
+                        pupil_1khz = downsample(pupil', 30)'; % Downsample to 1 kHz
+                        dat_iti(n).pupil = pupil_1khz;
+                    end
+    
+                    if ~isempty(diode_channel)
+                        diode = out_ns5.data(diode_channel, ns5_rng(trialends_samp(n)+1:trialstarts_samp(n+1)-1));
+                        diode_1khz = downsample(diode', 30)'; % Downsample to 1 kHz
+                        dat_iti(n).diode = diode_1khz;
+                    end
+                end
+                
+                % Process neural spikes, if applicable
+                if ~isempty(neural_channels) & ~isempty(this_trial)
+                    spks = this_trial(ismember(this_trial(:, 1), neural_channels), :);
+    
+                    [spks_byUnit, netLabels_byUnit] = deal(cell(1,size(channels, 1)));
+                    for u = 1:size(channels,1)
+                        spks_byUnit{u} = ((spks(spks(:,1) == channels(u,1) & spks(:,2) == channels(u,2), 3)') - (trialsends(n)+(1/Fs))) .* 1000;
+                        if spike_sort
+                            netLabels_byUnit{u} = (spks(spks(:,1) == channels(u,1) & spks(:,2) == channels(u,2), 4)');
+                            %waveforms_byUnit{u} = (spks(spks(:,1) == channels(u,1) & spks(:,2) == channels(u,2), 5:end)');
+                        end
+                    end
+    
+                    dat_iti(n).(sprintf('spiketimes_%d', probe_index)) = spks_byUnit; % Store spike times
+                    if spike_sort
+                        dat_iti(n).(sprintf('netlabels_%d', probe_index)) = netLabels_byUnit; % Store spike sorting labels
+                    end
+                end
+            end
+
     
         end
+
+
         dat = getDatParams(dat); % Final parameter extraction
+        dat_iti = getDatParams(dat_iti);
     
         % Concatenate the new structured data to the main array
         dat_all = [dat_all; dat];
+        dat_iti_all = [dat_iti_all; dat_iti];
     end
 
     dat = dat_all;
+    dat_iti = dat_iti_all;
 end

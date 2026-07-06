@@ -24,7 +24,17 @@ end
 tbl = in_tbl;
 
 % Add filtered eye traces and kinematic derivatives
-eyePos = cellfun(@(x) filterEyeTraces_EyeLink(x), tbl.eyedata, 'uni', 0);
+eyePos = cell(height(tbl),1);
+for i = 1:height(tbl)
+    eyedata = tbl.eyedata{i};
+    if size(tbl.eyedata{i},2) > 20
+        eyePos{i} = filterEyeTraces_EyeLink(eyedata);
+    else
+        eyePos_temp = filterEyeTraces_EyeLink([tbl.eyedata{i-1} tbl.eyedata{i}]);
+        eyePos{i} = eyePos_temp(:,(end-size(tbl.eyedata{i},2)+1):end);
+    end
+end
+
 [eyeVel, eyeAcc] = cellfun(@(x) calcDerivative_eyeTraces(x), eyePos, 'uni', 0);
 
 if ismember('FIXATE', tbl.Properties.VariableNames) && ~iscell(tbl.FIXATE), tbl.FIXATE = num2cell(tbl.FIXATE); end
@@ -63,16 +73,19 @@ elseif any(contains(taskName, {'mdir', 'dirmem'}))
 
     if ~ismember('angle', tbl.Properties.VariableNames)
         tbl.angle = cellfun(@(q) q.distance, {tbl.params.block}.', 'uni', 1);
+        tbl.angle(tbl.result=='NaN') = NaN;
     end
 
     if ~ismember('distance', tbl.Properties.VariableNames)
         tbl.distance = cellfun(@(q) q.distance, {tbl.params.block}.', 'uni', 1);
+        tbl.distance(tbl.result=='NaN') = NaN;
     end
     tbl = movevars(tbl,{'distance','angle'},'After','time_sec');
     tbl.distance = cellfun(@(q) round(pix2deg(q,tbl(1,:).params.block.screenDistance,tbl(1,:).params.block.pixPerCM)), num2cell(tbl.distance), 'uni', 1);
 
     if all(ismember({'targetOnsetDelay', 'delay'}, tbl.Properties.VariableNames))
         tbl.fixDuration = tbl.targetOnsetDelay+tbl(1,:).params.block.targetDuration+tbl.delay;
+        tbl.fixDuration(tbl.result=='NaN') = NaN;
 
         tbl = movevars(tbl,{'targetOnsetDelay','delay','fixDuration'},'Before','result');
     end

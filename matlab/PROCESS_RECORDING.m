@@ -7,7 +7,7 @@ function PROCESS_RECORDING(session_name,varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Default paths to add to the MATLAB path    
 defaultRAW_PATH   =  '/Volumes/lab_NHPdata';
-defaultOUT_PATH   =  '/Volumes/SHARED_STUFF/lab_NHPdata-processed';
+defaultOUT_PATH   =  '/Volumes/lab_NHPdata-processed';
 defaultNEV_PATH   =   '/Users/kendranoneman/Packages/nevutils';
 defaultHELP_PATH  =  '/Users/kendranoneman/Projects/mayo/helperfunctions';
 
@@ -20,6 +20,7 @@ addParameter(p, 'NASNET_PATH', [], @ischar); % only used for plex or FHC
 addParameter(p, 'HELPERS_PATH', defaultHELP_PATH, @ischar);
 addParameter(p, 'SORTER_PATH', [], @ischar);
 addParameter(p, 'BEHAVIOR_ONLY', false, @islogical);
+addParameter(p, 'INCLUDE_ITI', false, @islogical);
 
 % Parse inputs
 parse(p, session_name, varargin{:});
@@ -30,6 +31,7 @@ NET_PATH       =  p.Results.NASNET_PATH;
 HELPERS_PATH   =  p.Results.HELPERS_PATH;
 SORTER_PATH    =  p.Results.SORTER_PATH;
 BEHAV_ONLY     =  p.Results.BEHAVIOR_ONLY;
+INCLUDE_ITI    =  p.Results.INCLUDE_ITI;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 fprintf('\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
@@ -121,7 +123,7 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
         [nev, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', false, 'READ_LFP', false, 'alignPulseEnabled', true);
         startAcquisition = datetime(out_ns5.hdr.timeOrigin, 'InputFormat', 'dd-MMM-yyyy HH:mm:ss.SSS');
 
-        [dat, ~, ~, ~] = format_datTrials(nev, out_ns5, 'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
+        [dat, dat_iti, ~, ~, ~] = format_datTrials(nev, out_ns5, 'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
 
         firstSyncPulse = startAcquisition + seconds(dat(1).trialcodes(2,3));
         ripple_pulse_timeStamps = cellfun(@(w) (firstSyncPulse + seconds(w)) - seconds(dat(1).trialcodes(2,3)), cellfun(@(q) q(2,3), {dat.trialcodes}.', 'uni', 0), 'uni', 1);     
@@ -143,17 +145,17 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
             end
         end 
 
-        tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
+        tbl = convert_smithDat_mayoTbl(dat, dat_iti, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
     
     %------------------------------------- PLEXON -------------------------------------%
     elseif ismember('plexon',metadata.probe_type)
         if any(contains(this_task, {'fstm', 'fast'}))
             [nev, out_ns5, ~] = extract_nevout(nevpath);
             if ~isempty(nev)
-                [dat, ~, tempdata, ~] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ... 
+                [dat, dat_iti, ~, tempdata, ~] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ... 
                                         'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
                 prev_tempdata = tempdata;
-                tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
+                tbl = convert_smithDat_mayoTbl(dat, dat_iti, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
                 tbl = removevars(tbl, 'time_sec');
             end
         else
@@ -162,7 +164,7 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
 
                 [nev, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', true, 'netFolder', fullfile(NET_PATH,'networks'), 'READ_LFP', false);
 
-                [dat, ~, tempdata, ~] = format_datTrials(nev, out_ns5, 'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
+                [dat, dat_iti, ~, tempdata, ~] = format_datTrials(nev, out_ns5, 'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
 
                 sorting_all = [];
                 for probe = 1:numel(metadata.hardware_config)
@@ -177,7 +179,7 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
                         neural_chans = 385:513;
                     end
         
-                    [dat2, ~, ~, chans] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ...
+                    [dat2, dat_iti, ~, ~, chans] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ...
                                     'NEURAL_CHANNELS', neural_chans, 'PROBE_INDEX', probe, ...
                                     'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
                     
@@ -215,16 +217,16 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
                 end
                 
                 prev_tempdata = tempdata;
-                tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
+                tbl = convert_smithDat_mayoTbl(dat, dat_iti, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
                 tbl = removevars(tbl, 'time_sec');
             else
                 [nev, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', false);
 
-                [dat, ~, tempdata, ~] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ...
+                [dat, dat_iti, ~, tempdata, ~] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ...
                                 'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
 
                 prev_tempdata = tempdata;
-                tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
+                tbl = convert_smithDat_mayoTbl(dat, dat_iti, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
                 tbl.time_sec = tbl.time_sec+rip_time_start;
                 rip_time_start = rip_time_start + double(out_ns5.hdr.nSamples/out_ns5.hdr.Fs);
            end     
@@ -234,7 +236,7 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
         if any(contains(this_task, {'fstm', 'fast'}))
             [nev, out_ns5, ~] = extract_nevout(nevpath);
             if ~isempty(nev)
-                [dat, ~, tempdata, ~] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ... 
+                [dat, dat_iti, ~, tempdata, ~] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ... 
                                         'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
             end
         else
@@ -257,7 +259,7 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
                 neural_chan = this_chan+384;
             end 
 
-            [dat, ~, tempdata, chans] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ...
+            [dat, dat_iti, ~, tempdata, chans] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ...
                                                   'NEURAL_CHANNELS', neural_chan, 'EYE_CHAN_LABELS', eye_chan_labels, ...
                                                   'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
             probe = 1;
@@ -313,15 +315,15 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
         [~, fname, ~] = fileparts(nevpath);   % 'kendra_scrappy_0066a_mdir1'
         this_task = erase(fname, session_name); % 'a_mdir1'
         
-        tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
+        tbl = convert_smithDat_mayoTbl(dat, dat_iti, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
         tbl = removevars(tbl, 'time_sec');
     
     %------------------------------------- BEHAVIOR ONLY -------------------------------------%
     else 
         [nev, out_ns5, ~] = extract_nevout(nevpath);
         if ~isempty(nev)
-            [dat, ~] = format_datTrials(nev, out_ns5, 'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
-            tbl = convert_smithDat_mayoTbl(dat, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
+            [dat, dat_iti, ~, ~, ~] = format_datTrials(nev, out_ns5, 'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
+            tbl = convert_smithDat_mayoTbl(dat, dat_iti, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH);
             tbl = removevars(tbl, 'time_sec');
         else
             dat = []; tbl = [];
@@ -350,8 +352,10 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
                 ap_meta = readMetaFile(fullfile(RAW_PATH, session_name, [session_name, '_', metadata.hardware_config{probe}], [session_name, '_t0.', metadata.hardware_config{probe}, '.ap.meta']));
 
                 lfp_fs = lfp_meta.imSampRate;
-                trial_starts_sec = cellfun(@(q,v) q-(v./1000), num2cell(these_alignTimes), tbl.ALIGN_PULSE(:,1), 'uni', 1);
-                trial_ends_sec = trial_starts_sec + (tbl.END_TRIAL./1000);
+
+                new_alignTimes = repelem(these_alignTimes, 2); new_alignTimes(end) = [];
+                trial_starts_sec = cellfun(@(q,v) q-(v(1)./1000), num2cell(new_alignTimes), tbl.ALIGN_PULSE, 'uni', 1);
+                trial_ends_sec = trial_starts_sec + (tbl.time_sec(:,2)-tbl.time_sec(:,1));
     
                 trial_starts_lfp_samp = floor(trial_starts_sec * lfp_fs);
                 trial_ends_lfp_samp = ceil(trial_ends_sec * lfp_fs);
@@ -399,13 +403,6 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
                 end
 
                 motion_path = fullfile(RAW_PATH, session_name, [session_name, '_', metadata.hardware_config{probe}], 'preprocess', preprocess_hash, pp_hash, motion_hash);
-                %load(fullfile(motion_path,'motion.mat'));
-                %load(fullfile(motion_path,'depth_bins.mat'));
-                %load(fullfile(motion_path,'time_bins.mat'));
-
-                %sorting.motion = double(motion);
-                %sorting.depth_bins = double(depth_bins);
-                %sorting.time_bins = double(time_bins);
 
                 sorting_all = [sorting_all; sorting];
             end
