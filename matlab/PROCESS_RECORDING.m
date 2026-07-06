@@ -159,10 +159,12 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
 
         if contains(session_name, 'kendra_scrappy_0136a') 
             [dat,these_alignTimes,goodFlag] = fix_specificSessions(session_name,np_mask,ripple_mask,alignTimes,dat,goodFlag);
+            INCLUDE_ITI = false;
         else
             these_alignTimes = alignTimes(np_mask);
             if sum(np_mask) < length(ripple_mask)
                 dat = dat(ripple_mask);
+                dat_iti = dat_iti(ripple_mask(1:end-1));
             end
         end 
 
