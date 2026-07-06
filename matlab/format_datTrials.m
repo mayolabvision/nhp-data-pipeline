@@ -158,7 +158,7 @@ function [dat, dat_iti, epochEnd, tempdata, channels] = format_datTrials(nev, ou
             
         [dat, dat_iti] = init_trial_structs(length(trialstarts), ~isempty(eye_channel_labels));
 
-        %dat_iti(end) = [];
+        dat_iti(end) = [];
 
         %% Loop through trials and organize data
         for n = 1:length(trialstarts)

@@ -68,6 +68,10 @@ for t = 1:height(tbl)
     rp = tbl.ALIGN_PULSE{t,1};
     et =  tbl.END_TRIAL(t);
 
+    fprintf(np)
+    fprintf(rp)
+    fprintf(et)
+
     spike_units = clusters.spike_clusters(spike_times_sec>=(np-(rp./1000)) & spike_times_sec<=(np+((et-rp)./1000)));
     spike_times = ((spike_times_sec((spike_times_sec>=(np-(rp./1000)) & spike_times_sec<=(np+((et-rp)./1000)))) - np)*1000) + rp;
 

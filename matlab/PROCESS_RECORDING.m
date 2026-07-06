@@ -343,7 +343,7 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
                 tbl.imecLFP_samp = [trial_starts_lfp_samp trial_ends_lfp_samp];
 
                 % Pull out SpikeInterface sorting outputs
-                [spikes_perTrial,sorting,~] = parse_SortingToTbl(tbl, fullfile(si_path,'sorter_output'), 'NP_ALIGN_PULSES', these_alignTimes, 'Fs', ap_meta.imSampRate);
+                [spikes_perTrial,sorting,~] = parse_SortingToTbl(tbl, fullfile(si_path,'sorter_output'), 'NP_ALIGN_PULSES', new_alignTimes, 'Fs', ap_meta.imSampRate);
             end
 
             tbl.(sprintf('spiketimes_%d',probe)) = spikes_perTrial;  

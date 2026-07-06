@@ -41,10 +41,10 @@ sorter_path, short_path = profile_to_mat('${SESSION}', protocol='${PROTOCOL}.jso
 print(sorter_path, short_path)
 ")
 
-SORTER_PATH=$(echo "$RESULT" | awk '{print $1}')
-SHORT_PATH=$(echo "$RESULT" | awk '{print $2}')
+SORTER_HASH=$(echo "$RESULT" | awk '{print $1}')
+SHORT_HASH=$(echo "$RESULT" | awk '{print $2}')
 
-echo "SORTER_PATH = '$SORTER_PATH'"
+echo "SORTER_HASH = '$SORTER_HASH'"
 
 #################################################################
 ################### RUN MATLAB SCRIPT #######################
@@ -65,7 +65,7 @@ PROCESS_RECORDING('${SESSION}', ...
     'NEVUTIL_PATH', '$NEV_PATH', ... 
     'NASNET_PATH', '$NET_PATH', ...
     'HELPERS_PATH', '$HELP_PATH', ...
-    'SORTER_PATH', '$SORTER_PATH');
+    'SORTER_HASH', '$SORTER_HASH');
 exit
 EOF
 
