@@ -33,27 +33,6 @@ echo "PROTOCOL   =  $PROTOCOL"
 echo "======================================================"
 
 #################################################################
-################ Check that raw signal exists ###################
-
-module load matlab/R2023a
-NEV_PATH=$(python -c "import config; print(config.NEVUTIL_PATH)")
-RAW_DATA_PATH=$(python -c "import config; print(config.RAW_DATA_PATH)")
-PROBES_PATH=$(python -c "import config; print(config.PROBES_PATH)")
-DATA_PATH="${RAW_DATA_PATH}/${SESSION}"
-
-echo "Checking for raw signal in Ripple files..............."
-matlab -nodisplay <<EOF
-addpath(genpath('matlab'));
-addpath(genpath('${NEV_PATH}'));
-fprintf('Running rawRipple_to_binaryFile for ${SESSION}\n');
-rawRipple_to_binaryFile('${DATA_PATH}', '${PROBES_PATH}', $((PROBE_ID + 1)));
-exit
-EOF
-
-sleep 5
-echo "=================================================="
-
-#################################################################
 ##################### RUN SORTING ########################
 
 echo "Running preprocessing pipeline........................"

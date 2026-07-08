@@ -102,6 +102,7 @@ if BEHAV_ONLY | isempty(metadata.probe_type)
     NET_PATH = [];
     SORTER_HASH = [];
     metadata.probe_type = 'behavior';
+    disp('BEHAVIOR ONLY');
 end
 
 % Normalize the "no sorter" sentinel value to an empty path
