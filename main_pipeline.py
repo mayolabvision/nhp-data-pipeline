@@ -1,7 +1,6 @@
 # main_pipeline.py
 from pathlib import Path
 import os
-import hashlib
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
 from pipeline import get_recording_profile, save_protocol_to_dict
@@ -101,7 +100,7 @@ def profile_to_mat(session, protocol=None):
     # Get only the part after "sorting"
     if profile.sorter_path is not None:
         sorter_path = str(profile.sorter_path).split("sorting", 1)[1].lstrip("/\\")
-        short_path = hashlib.sha256(sorter_path.encode()).hexdigest()[:16]
+        short_path = profile.short_hash
     else:
         sorter_path = None
         short_path  = None

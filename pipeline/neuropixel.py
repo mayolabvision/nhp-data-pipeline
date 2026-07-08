@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 import os
 import shutil
+import hashlib
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
 import json
@@ -64,13 +65,17 @@ class NeuropixelProfile(RecordingProfile):
 
         self.full_hash = "-".join([self.preprocess_hash, self.pp_hash, self.motion_hash, self.shake_hash, self.trim_hash, self.sorter_hash])
         self.sorter_path = self.data_path / "sorting" / self.full_hash
- 
+
+        # Get only the part after "sorting"
+        short_sorter_path = str(self.sorter_path).split("sorting", 1)[1].lstrip("/\\")
+        self.short_hash = hashlib.sha256(short_sorter_path.encode()).hexdigest()[:16]
+
         self.analyzer_path = self.sorter_path / 'analyzer'
         self.metrics_path = self.sorter_path / 'quality_metrics'
-        
-        self.tbl_path = self.data_path.parent / "tables" / f"{self.session}-{self.full_hash}.mat"
 
-        self.figs_path = self.data_path.parent / "figs" / self.full_hash / f"{self.metadata['hardware_config'][self.probe_id]}_{self.metadata['probe_label'][self.probe_id]}"
+        self.tbl_path = self.data_path.parent / "tables" / f"{self.session}-{self.short_hash}.mat"
+
+        self.figs_path = self.data_path.parent / "figs" / self.short_hash / f"{self.metadata['hardware_config'][self.probe_id]}_{self.metadata['probe_label'][self.probe_id]}"
         save_params(self.figs_path / "params.json", self.protocol)
 
     def preprocessing(self):

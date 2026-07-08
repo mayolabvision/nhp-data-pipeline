@@ -30,6 +30,7 @@ class RecordingProfile(ABC):
         self.sorter_hash = None
         self.sorter_params = None
         self.full_hash = None
+        self.short_hash = None
         self.analyzer_path = None
         self.metrics_path = None
         self.tbl_path = None
