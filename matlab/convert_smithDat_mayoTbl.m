@@ -129,12 +129,14 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
     tbl.params = tbl1.params;
     tbl.eyedata = tbl1.eyedata; tbl.pupil = tbl1.pupil; tbl.diode = tbl1.diode;
 
-    names = string(tbl.trialName);
-    itiRows = find(contains(names, '.iti.'));
-    for i = 1:numel(itiRows)
-        r = itiRows(i);
-        trlName = strrep(names(r), '.iti.', '.trl.');
-        tbl.ALIGN_PULSE(r) = cellfun(@(q) q - (tbl.END_TRIAL(names==trlName)-1), tbl.ALIGN_PULSE(names==trlName), 'uni', 0);
+    if ismember('ALIGN_PULSE', tbl1.Properties.VariableNames)
+        names = string(tbl.trialName);
+        itiRows = find(contains(names, '.iti.'));
+        for i = 1:numel(itiRows)
+            r = itiRows(i);
+            trlName = strrep(names(r), '.iti.', '.trl.');
+            tbl.ALIGN_PULSE(r) = cellfun(@(q) q - (tbl.END_TRIAL(names==trlName)+1), tbl.ALIGN_PULSE(names==trlName), 'uni', 0);
+        end
     end
 
     [~, idx] = sort(tbl.time_sec(:,1));
