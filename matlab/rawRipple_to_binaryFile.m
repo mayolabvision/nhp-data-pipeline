@@ -30,7 +30,7 @@ function rawRipple_to_binaryFile(data_path,probes_path,probe_index)
 json_text = fileread(fullfile(data_path,'metadata.json'));
 metadata = jsondecode(json_text);
 
-if probe_index > numel(metadata.probe_type) || ~isequal(metadata.probe_type{probe_index}, 'plexon')
+if isempty(metadata.probe_type) || probe_index > numel(metadata.probe_type) || ~isequal(metadata.probe_type{probe_index}, 'plexon')
     return
 end
 
