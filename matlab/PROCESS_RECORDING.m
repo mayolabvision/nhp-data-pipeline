@@ -410,8 +410,6 @@ S = unify_taskTables(S1,taskTypes);
 
 if ~exist(fullfile(OUT_PATH, session_name, 'tables'), 'dir'), mkdir(fullfile(OUT_PATH, session_name, 'tables')); end
 
-disp(NET_PATH)
-
 if SORTER_HASH
     short_id = shorten_sorter_path(SORTER_HASH, fullfile(OUT_PATH, session_name, 'tables'));
     save(fullfile(OUT_PATH, session_name, 'tables', sprintf('%s-%s.mat', session_name, short_id)), 'S', '-v7.3');

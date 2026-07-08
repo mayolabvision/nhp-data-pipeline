@@ -18,13 +18,16 @@ class FHCProfile(RecordingProfile):
     def prep_session_data(self):
         self.data_path = Path(RAW_DATA_PATH) / self.session
         
-        self.tbl_path = self.data_path / "tables" / f"{self.session}.mat"
+        self.tbl_path = self.data_path / "tables" / f"{self.session}-nasnet.mat"
         self.figs_path = self.data_path / "figs" / f"{self.metadata['hardware_config'][self.probe_id]}_{self.metadata['probe_label'][self.probe_id]}"
         save_params(self.figs_path / "params.json", self.protocol)
     
     def preprocessing(self):
         pass
 
+    def shake_trimming(self):
+        pass
+ 
     def spike_sorting(self):
         pass
 
@@ -33,3 +36,7 @@ class FHCProfile(RecordingProfile):
 
     def quality_metrics(self):
         pass
+
+    def post_widgets(self):
+        pass
+

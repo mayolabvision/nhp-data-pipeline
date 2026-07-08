@@ -234,7 +234,7 @@ function [dat, dat_iti, epochEnd, tempdata, channels] = format_datTrials(nev, ou
                 % Extract and process eye data
                 if ~isempty(eye_channel_labels)
                     [dat_iti(n).eyedata, dat_iti(n).pupil, dat_iti(n).diode] = extract_eye_pupil_diode(out_ns5, ...
-                        ns5_rng(trialends_samp(n)+1:trialstarts_samp(n+1)-1), dat(n).params, eye_channels, pupil_channel, diode_channel);
+                        ns5_rng(trialends_samp(n)+1:trialstarts_samp(n+1)-1), dat_iti(n).params, eye_channels, pupil_channel, diode_channel);
                 end
                 
                 % Process neural spikes, if applicable
