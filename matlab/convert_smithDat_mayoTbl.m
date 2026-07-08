@@ -134,7 +134,7 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
     for i = 1:numel(itiRows)
         r = itiRows(i);
         trlName = strrep(names(r), '.iti.', '.trl.');
-        tbl.ALIGN_PULSE(r) = cellfun(@(q) q - (tbl.END_TRIAL(names==trlName)+1), tbl.ALIGN_PULSE(names==trlName), 'uni', 0);
+        tbl.ALIGN_PULSE(r) = cellfun(@(q) q - (tbl.END_TRIAL(names==trlName)-1), tbl.ALIGN_PULSE(names==trlName), 'uni', 0);
     end
 
     [~, idx] = sort(tbl.time_sec(:,1));

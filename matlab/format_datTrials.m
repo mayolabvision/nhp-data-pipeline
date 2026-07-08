@@ -250,7 +250,6 @@ function [dat, dat_iti, epochEnd, tempdata, channels] = format_datTrials(nev, ou
     
         end
 
-
         dat = getDatParams(dat); % Final parameter extraction
         dat_iti = getDatParams(dat_iti);
     
