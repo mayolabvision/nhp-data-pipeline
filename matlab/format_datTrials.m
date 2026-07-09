@@ -171,7 +171,7 @@ function [dat, dat_iti, epochEnd, tempdata, channels] = format_datTrials(nev, ou
             this_trial = this_nev(trialstartinds(n):trialendinds(n), :);
             trialdig = this_trial(this_trial(:, 1) == 0, :);
             dat(n).text = char(trialdig(trialdig(:, 2) >= 256 & trialdig(:, 2) < 512, 2) - 256)';
-            dat(n).trialcodes = trialdig(trialdig(:, 2) < 256 | (trialdig(:, 2) >= 1000 & trialdig(:, 2) <= 32000), :);
+            dat(n).trialcodes = trialdig(trialdig(:, 2) < 256 | (trialdig(:, 2) >= 1000 & trialdig(:, 2) <= 32000), 1:3);
 
             % Extract trial result
             event = uint32(trialdig);
@@ -238,7 +238,7 @@ function [dat, dat_iti, epochEnd, tempdata, channels] = format_datTrials(nev, ou
                 end
                 
                 % Process neural spikes, if applicable
-                if ~isempty(neural_channels) & ~isempty(this_trial)
+                if ~isempty(neural_channels)
                     [spks_byUnit, netLabels_byUnit] = extract_spikes_byUnit(this_trial, neural_channels, channels, trialends(n)+(1/Fs), spike_sort);
                     dat_iti(n).(sprintf('spiketimes_%d', probe_index)) = spks_byUnit; % Store spike times
                     if spike_sort
