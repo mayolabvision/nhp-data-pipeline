@@ -64,7 +64,7 @@ addParameter(p, 'NASNET_PATH', [], @ischar); % only used for plex or FHC
 addParameter(p, 'HELPERS_PATH', defaultHELP_PATH, @ischar);
 addParameter(p, 'SORTER_HASH', [], @ischar);
 addParameter(p, 'BEHAVIOR_ONLY', false, @islogical);
-addParameter(p, 'INCLUDE_ITI', true, @islogical);
+addParameter(p, 'INCLUDE_ITI', false, @islogical);
 
 % Parse inputs
 parse(p, session_name, varargin{:});
