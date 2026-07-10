@@ -82,13 +82,17 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
     tbl1 = struct2table(dat); tbl2 = struct2table(dat_iti);
     tbl = table(); 
 
-    % trial names, trl = within-trial and iti = inter-trial
-    tbl.trialName = [cellfun(@(q) [TASK_NAME, '.trl.', sprintf('%04d', q)], num2cell(1:height(tbl1))', 'uni', 0); cellfun(@(q) [TASK_NAME, '.iti.', sprintf('%04d', q)], num2cell(1:height(tbl2))', 'uni', 0)];
-    tbl.trialName = categorical(string(tbl.trialName));
-
     if INCLUDE_ITI
+        % trial names, trl = within-trial and iti = inter-trial
+        tbl.trialName = [cellfun(@(q) [TASK_NAME, '.trl.', sprintf('%04d', q)], num2cell(1:height(tbl1))', 'uni', 0); cellfun(@(q) [TASK_NAME, '.iti.', sprintf('%04d', q)], num2cell(1:height(tbl2))', 'uni', 0)];
+        tbl.trialName = categorical(string(tbl.trialName));
+
         tbl1 = [tbl1; tbl2];
     else
+        % trial names, trl = within-trial and iti = inter-trial
+        tbl.trialName = cellfun(@(q) [TASK_NAME, '.trl.', sprintf('%04d', q)], num2cell(1:height(tbl1))', 'uni', 0);
+        tbl.trialName = categorical(string(tbl.trialName));
+
         tbl1 = tbl1;
     end
 
@@ -133,13 +137,17 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
     tbl.params = tbl1.params;
     tbl.eyedata = tbl1.eyedata; tbl.pupil = tbl1.pupil; tbl.diode = tbl1.diode;
 
-    if ismember('ALIGN_PULSE', tbl1.Properties.VariableNames) & INCLUDE_ITI
-        names = string(tbl.trialName);
-        itiRows = find(contains(names, '.iti.'));
-        for i = 1:numel(itiRows)
-            r = itiRows(i);
-            trlName = strrep(names(r), '.iti.', '.trl.');
-            tbl.ALIGN_PULSE(r) = cellfun(@(q) q - (tbl.END_TRIAL(names==trlName)+1), tbl.ALIGN_PULSE(names==trlName), 'uni', 0);
+    if ismember('ALIGN_PULSE', tbl.Properties.VariableNames)
+        if INCLUDE_ITI
+            names = string(tbl.trialName);
+            itiRows = find(contains(names, '.iti.'));
+            for i = 1:numel(itiRows)
+                r = itiRows(i);
+                trlName = strrep(names(r), '.iti.', '.trl.');
+                tbl.ALIGN_PULSE(r) = cellfun(@(q) q - (tbl.END_TRIAL(names==trlName)+1), tbl.ALIGN_PULSE(names==trlName), 'uni', 0);
+            end
+        else
+             tbl.ALIGN_PULSE = num2cell(cell2mat(tbl.ALIGN_PULSE), 2);
         end
     end
 

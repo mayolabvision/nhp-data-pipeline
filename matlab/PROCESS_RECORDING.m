@@ -324,8 +324,8 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
         sorting_all = []; spike_times = cell(numel(metadata.probe_type),1);
         for probe = 1:numel(metadata.probe_type)
 
-            %si_path = fullfile(RAW_PATH, session_name, [session_name, '_', metadata.hardware_config{probe}], 'sorting', SORTER_HASH);
-            si_path = fullfile(OUT_PATH, session_name, [session_name, '_', metadata.hardware_config{probe}], 'sorting', SORTER_HASH);
+            si_path = fullfile(RAW_PATH, session_name, [session_name, '_', metadata.hardware_config{probe}], 'sorting', SORTER_HASH);
+            %si_path = fullfile(OUT_PATH, session_name, [session_name, '_', metadata.hardware_config{probe}], 'sorting', SORTER_HASH);
 
             if isequal(metadata.probe_type{probe},'plexon')
                 ripple_info = loadMetadataJSON(fullfile(RAW_PATH, session_name, [session_name, '_', metadata.hardware_config{probe}], 'ripple_info.json'));
