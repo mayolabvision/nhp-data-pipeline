@@ -16,42 +16,10 @@ Fs = p.Results.Fs;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Load in MATLAB table
 tic
-kilo_files1 = dir(fullfile(si_path, '*.mat'));
-for i = 1:length(kilo_files1)
-    kpath = fullfile(si_path, kilo_files1(i).name);
-    [~, kname, ~] = fileparts(kpath);
-    
-    loaded = load(kpath);  % Load into struct
-    varNames = fieldnames(loaded);  % Get the name(s) of loaded variables
-
-    loaded_var = loaded.(varNames{1});
-    if isa(loaded_var, 'single') || isa(loaded_var, 'int32') || isa(loaded_var, 'int64')
-        loaded_var = double(loaded_var);
-    end
-    
-    % Assign the first variable in the .mat file to the struct
-    sorting.(kname) = loaded_var;
-end
-
-% .tsv files
-kilo_files2 = dir(fullfile(si_path, '*.tsv'));
-[~, sort_idx] = sort({kilo_files2.name}.');
-kilo_files2 = kilo_files2(sort_idx);
-
-for ii = 1:length(kilo_files2)
-    cfpath = fullfile(kilo_files2(ii).folder, kilo_files2(ii).name);
-    %[~, cfname, ~] = fileparts(kilo_files2(ii).name);
-    if ii==1
-        clusts = readtable(cfpath, 'FileType', 'text', 'Delimiter', '\t');
-    else
-        cc = readtable(cfpath, 'FileType', 'text', 'Delimiter', '\t');
-        cc2 = join(clusts, cc, 'Keys', 'cluster_id');
-        clusts = cc2;
-    end
-end
-sorting.clusters = clusts; 
+sorting = load_sortingOutputs(si_path);
 
 spike_times_sec = double(sorting.spike_times)./Fs;
+nClusters = max(sorting.spike_clusters) + 1; % cluster_id is 0-indexed (kilosort/phy); spikes_perTrial{t}{k} = cluster_id (k-1)
 
 spikes_perTrial = cell(height(tbl),1);
 for t = 1:height(tbl)
@@ -74,7 +42,7 @@ for t = 1:height(tbl)
         spike_times = ((spike_times_sec((spike_times_sec>=(np-(rp./1000)) & spike_times_sec<=(np+((et-rp)./1000)))) - np)*1000) + rp;   
     end
 
-    spikes_perTrial{t} = cellfun(@(u) spike_times(spike_units==u), num2cell(double(unique(sorting.spike_clusters)+1)), 'uni', 0);
+    spikes_perTrial{t} = cellfun(@(u) spike_times(spike_units==u), num2cell((0:nClusters-1)'), 'uni', 0);
 end
 
 spike_counts = cellfun(@(w) cellfun(@(q) numel(q), w, 'uni', 1), spikes_perTrial, 'uni', 0);

@@ -169,6 +169,11 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
             end
         end 
 
+        % Pulling out continuus stream of data
+        [eyedata, eye_times, trial_events] = extract_eyeStream(nev, out_ns5, 'EYE_CHAN_LABELS', eye_chan_labels);
+        np_win_sec = [these_alignTimes(1), these_alignTimes(1)+(numel(eye_times)/1000)] - 1;
+        eye_times = eye_times + (these_alignTimes(1) - alignTimes(1));
+
         tbl = convert_smithDat_mayoTbl(dat, dat_iti, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH, 'INCLUDE_ITI', INCLUDE_ITI);
     
     %------------------------------------- PLEXON -------------------------------------%
@@ -316,10 +321,11 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
         hashes = split(SORTER_HASH, '-');
         preprocess_hash = hashes{1}; pp_hash = hashes{2}; motion_hash = hashes{3}; %sorter_hash = hashes{4};
 
-        sorting_all = [];
+        sorting_all = []; spike_times = cell(numel(metadata.probe_type),1);
         for probe = 1:numel(metadata.probe_type)
 
-            si_path = fullfile(RAW_PATH, session_name, [session_name, '_', metadata.hardware_config{probe}], 'sorting', SORTER_HASH);
+            %si_path = fullfile(RAW_PATH, session_name, [session_name, '_', metadata.hardware_config{probe}], 'sorting', SORTER_HASH);
+            si_path = fullfile(OUT_PATH, session_name, [session_name, '_', metadata.hardware_config{probe}], 'sorting', SORTER_HASH);
 
             if isequal(metadata.probe_type{probe},'plexon')
                 ripple_info = loadMetadataJSON(fullfile(RAW_PATH, session_name, [session_name, '_', metadata.hardware_config{probe}], 'ripple_info.json'));
@@ -347,6 +353,10 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
 
                 % Pull out SpikeInterface sorting outputs
                 [spikes_perTrial,sorting,~] = parse_SortingToTbl(tbl, fullfile(si_path,'sorter_output'), 'NP_ALIGN_PULSES', new_alignTimes, 'Fs', ap_meta.imSampRate);
+
+                % Continuous spikes to match eyedata stream
+                sptimes = extract_spikesInWindow(fullfile(si_path,'sorter_output'), np_win_sec, 'Fs', 30000);
+                spike_times{probe} = cellfun(@(q) q + (these_alignTimes(1) - alignTimes(1)), sptimes, 'uni', 0);
             end
 
             tbl.(sprintf('spiketimes_%d',probe)) = spikes_perTrial;  
@@ -396,6 +406,14 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
 
     S1.(this_task).dat = dat;
     S1.(this_task).tbl = tbl;
+
+    if ismember('neuropixel',metadata.probe_type)
+        S1.(this_task).eyedata = eyedata;
+        S1.(this_task).eye_times = eye_times;
+        S1.(this_task).trial_events = trial_events;
+        S1.(this_task).spike_times = spike_times;
+    end
+
 
 end
 

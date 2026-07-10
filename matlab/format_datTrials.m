@@ -277,25 +277,6 @@ end
 [dat, dat_iti] = deal(repmat(template, n_trials, 1));
 end
 
-function [eyedata, pupil, diode] = extract_eye_pupil_diode(out_ns5, samp_range, params, eye_channels, pupil_channel, diode_channel)
-%EXTRACT_EYE_PUPIL_DIODE  Extract and downsample eye/pupil/diode signals over one sample range.
-eyes = out_ns5.data(eye_channels, samp_range);
-eyes_1khz = downsample(eyes', 30)'; % Downsample to 1 kHz
-[eyedata, ~] = eye2deg(eyes_1khz(1:2, :), params); % Convert to degrees
-
-pupil = [];
-if ~isempty(pupil_channel)
-    p = out_ns5.data(pupil_channel, samp_range);
-    pupil = downsample(p', 30)'; % Downsample to 1 kHz
-end
-
-diode = [];
-if ~isempty(diode_channel)
-    d = out_ns5.data(diode_channel, samp_range);
-    diode = downsample(d', 30)'; % Downsample to 1 kHz
-end
-end
-
 function [spks_byUnit, netLabels_byUnit] = extract_spikes_byUnit(this_trial, neural_channels, channels, ref_time, spike_sort)
 %EXTRACT_SPIKES_BYUNIT  Extract per-channel spike times (ms, relative to ref_time) and sort labels.
 spks = this_trial(ismember(this_trial(:, 1), neural_channels), :);
