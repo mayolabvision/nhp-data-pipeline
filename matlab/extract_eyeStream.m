@@ -45,11 +45,11 @@ function [eyedata, eye_times, trial_events] = extract_eyeStream(nev, out_ns5, va
 % text) for the entire stream - it does not re-parse calibration if a block
 % transition happens partway through the recording, unlike format_datTrials.
 %
-% TRIAL NUMBERING: sync pulses (code == 0) are sent twice per trial, ~100 ms
-% apart. So trial 1 starts at the 1st occurrence of code 0, trial 2 starts
-% at the 3rd occurrence, trial k starts at the (2k-1)-th occurrence. Each
-% trial's labeled region runs from that start time through its own
-% end-trial (255) code.
+% TRIAL NUMBERING: trial k's labeled region runs from its own start-trial
+% (code == 1) time through its own end-trial (code == 255) time - this is
+% purely for labeling trial_events; the data window itself (eyedata/
+% eye_times) is unaffected and still starts 1 second before the first sync
+% pulse (see above).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 defaultEyeChanLabels = {'10241', '10242'};
@@ -70,6 +70,7 @@ prev_tempdata = p.Results.PREV_TEMPDATA;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 Fs = double(out_ns5.hdr.Fs); % Sampling frequency
+starttrial = 1; % Trial start code
 endtrial = 255; % Trial end code
 syncCode = 0; % Sync pulse code
 
@@ -102,6 +103,11 @@ end
 epoch_start_time = out_ns5.hdr.timeStamps(1, containing_epoch) / Fs;
 t_start = max(sync_time - 1, epoch_start_time);
 t_end = out_ns5.hdr.timeStamps(2, end) / Fs; % last recorded time bin in out_ns5
+
+startTimes = digcodes(digcodes(:, 2) == starttrial, 3);
+if isempty(startTimes)
+    error('extract_eyeStream:noStartTrial', 'No start-trial code (%d) found in this recording.', starttrial);
+end
 
 endTimes = digcodes(digcodes(:, 2) == endtrial, 3);
 if isempty(endTimes)
@@ -147,12 +153,13 @@ valid = code_bins >= 1 & code_bins <= N;
 codes_col = NaN(N, 1);
 codes_col(code_bins(valid)) = event_codes(valid, 2); % last code wins if two land in the same bin
 
-% Trial numbers: trial k starts at the (2k-1)-th sync pulse and ends at
-% its own end-trial (255) code
-nTrials = min(floor(numel(syncTimes) / 2), numel(endTimes));
+% Trial numbers: trial k starts at its own start-trial (1) code and ends at
+% its own end-trial (255) code. This is independent of the data window
+% itself (eyedata/eye_times still start 1 second before the first sync pulse).
+nTrials = min(numel(startTimes), numel(endTimes));
 trialnum_col = NaN(N, 1);
 for k = 1:nTrials
-    trial_start_time = syncTimes(2*k - 1);
+    trial_start_time = startTimes(k);
     trial_end_time = endTimes(k);
     bin_start = max(1, round((trial_start_time - t_start) * 1000) + 1);
     bin_end = min(N, round((trial_end_time - t_start) * 1000) + 1);

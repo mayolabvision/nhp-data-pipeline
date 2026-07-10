@@ -341,7 +341,12 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
 
                 % Reconstruct per-trial start/end times (in seconds and LFP
                 % samples) from the neuropixel sync pulses for this probe
-                new_alignTimes = repelem(these_alignTimes, 2); new_alignTimes(end) = [];
+                if INCLUDE_ITI
+                    new_alignTimes = repelem(these_alignTimes, 2); new_alignTimes(end) = [];
+                else
+                    new_alignTimes = these_alignTimes;
+                end
+                
                 trial_starts_sec = cellfun(@(q,v) q-(v(1)./1000), num2cell(new_alignTimes), tbl.ALIGN_PULSE, 'uni', 1);
                 trial_ends_sec = trial_starts_sec + (tbl.time_sec(:,2)-tbl.time_sec(:,1));
     
