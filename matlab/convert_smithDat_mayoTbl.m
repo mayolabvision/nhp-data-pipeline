@@ -86,7 +86,11 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
     tbl.trialName = [cellfun(@(q) [TASK_NAME, '.trl.', sprintf('%04d', q)], num2cell(1:height(tbl1))', 'uni', 0); cellfun(@(q) [TASK_NAME, '.iti.', sprintf('%04d', q)], num2cell(1:height(tbl2))', 'uni', 0)];
     tbl.trialName = categorical(string(tbl.trialName));
 
-    tbl1 = [tbl1; tbl2];
+    if INCLUDE_ITI
+        tbl1 = [tbl1; tbl2];
+    else
+        tbl1 = tbl1;
+    end
 
     if ismember('block', tbl1.Properties.VariableNames), tbl.block = tbl1.block; end
     if ismember('time', tbl1.Properties.VariableNames), tbl.time_sec = tbl1.time; end
@@ -129,7 +133,7 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
     tbl.params = tbl1.params;
     tbl.eyedata = tbl1.eyedata; tbl.pupil = tbl1.pupil; tbl.diode = tbl1.diode;
 
-    if ismember('ALIGN_PULSE', tbl1.Properties.VariableNames)
+    if ismember('ALIGN_PULSE', tbl1.Properties.VariableNames) & INCLUDE_ITI
         names = string(tbl.trialName);
         itiRows = find(contains(names, '.iti.'));
         for i = 1:numel(itiRows)
@@ -172,10 +176,5 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
     if ~isempty(LFP)
         tbl.lfp = LFP;
     end
-
-    if ~INCLUDE_ITI
-        tbl(contains(tbl.trialName, '.iti.'), :) = []; 
-    end
-
 
 end
