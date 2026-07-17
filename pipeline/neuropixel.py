@@ -215,7 +215,7 @@ class NeuropixelProfile(RecordingProfile):
 
             # horizontal pitch (dminx)
             xp = np.diff(np.sort(np.unique(prb.x.values)))
-            abs_xp = np.abs(xp[(xp != 0) & (np.abs(xp) <= 100)])
+            abs_xp = np.abs(xp[xp != 0])
             xvals, xcounts = np.unique(abs_xp, return_counts=True)
             xpitch = xvals[xcounts.argmax()] if abs_xp.size > 0 else ypitch
 
