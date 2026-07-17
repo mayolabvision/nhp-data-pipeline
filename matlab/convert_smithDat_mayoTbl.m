@@ -24,8 +24,6 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
     %       - net_labels: Spike sorting labels, if spike sorting is enabled
     %
     %%%% Optional parameters: %%%
-    %   TASK_NAME   -  Name of the task, if you want to label it something other than what you named is in Ex ('sessionNumber').
-    %
     %   LFP         -  Default = empty, if contains something should be cell array with same height as number of trials 
     %
     %%%% Outputs: %%%
@@ -52,7 +50,6 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
     p = inputParser;
     addRequired(p, 'dat', @isstruct);
     addRequired(p, 'dat_iti', @isstruct);
-    addParameter(p, 'TASK_NAME', [], @ischar);
     addParameter(p, 'LFP', []);
     addParameter(p, 'HELPERS_PATH', defaultHELP_PATH, @ischar);
     addParameter(p, 'INCLUDE_ITI', true, @islogical);
@@ -63,7 +60,6 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
     % Assign parsed values to variables
     dat = p.Results.dat;
     dat_iti = p.Results.dat_iti;
-    TASK_NAME = p.Results.TASK_NAME;
     LFP = p.Results.LFP;
     HELPERS_PATH = p.Results.HELPERS_PATH;
     INCLUDE_ITI = p.Results.INCLUDE_ITI;
@@ -71,30 +67,26 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
     addpath(fullfile(HELPERS_PATH,'behavior'));
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    if isempty(TASK_NAME)
-        if isnumeric(dat(1).params.block.sessionNumber)
-            TASK_NAME = sprintf('s%d',dat(1).params.block.sessionNumber);
-        else
-            TASK_NAME = dat(1).params.block.sessionNumber;
-        end
-    end
 
     tbl1 = struct2table(dat); tbl2 = struct2table(dat_iti);
     tbl = table(); 
 
     if INCLUDE_ITI
         % trial names, trl = within-trial and iti = inter-trial
-        tbl.trialName = [cellfun(@(q) [TASK_NAME, '.trl.', sprintf('%04d', q)], num2cell(1:height(tbl1))', 'uni', 0); cellfun(@(q) [TASK_NAME, '.iti.', sprintf('%04d', q)], num2cell(1:height(tbl2))', 'uni', 0)];
+        tbl.trialName = [cellfun(@(q) ['trl.', sprintf('%04d', q)], num2cell(1:height(tbl1))', 'uni', 0); cellfun(@(q) ['iti.', sprintf('%04d', q)], num2cell(1:height(tbl2))', 'uni', 0)];
         tbl.trialName = categorical(string(tbl.trialName));
 
         tbl1 = [tbl1; tbl2];
     else
         % trial names, trl = within-trial and iti = inter-trial
-        tbl.trialName = cellfun(@(q) [TASK_NAME, '.trl.', sprintf('%04d', q)], num2cell(1:height(tbl1))', 'uni', 0);
+        tbl.trialName = cellfun(@(q) ['trl.', sprintf('%04d', q)], num2cell(1:height(tbl1))', 'uni', 0);
         tbl.trialName = categorical(string(tbl.trialName));
 
         tbl1 = tbl1;
     end
+
+    tbl1 = reformatMultiTaskBlock(tbl1);
+    tbl.xmlName = categorical(erase(arrayfun(@(p) p.block.xmlFile, tbl1.params, 'uni', 0), '.xml'));
 
     if ismember('block', tbl1.Properties.VariableNames), tbl.block = tbl1.block; end
     if ismember('time', tbl1.Properties.VariableNames), tbl.time_sec = tbl1.time; end
@@ -110,8 +102,23 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
     % Make array of times of start/end time per trial, for aligning with trial codes and indexing eye data
     times_ms = cellfun(@(q) round(q(1)*1000:(q(2)+1)*1000), num2cell(tbl1.time,2), 'uni', 0);
     trialStarts = cellfun(@(q,r) find(q == round(r(r(:,2)==1,3)*1000)), times_ms, tbl1.trialcodes, 'uni', 0);
-    eventCodes = tbl1.trialcodes; eventCodes = vertcat(eventCodes{:});
-    eventCodes = num2cell(sort(unique(eventCodes(:,2))))';
+    allCodes = tbl1.trialcodes; allCodes = vertcat(allCodes{:});
+    allCodes = sort(unique(allCodes(:,2)));
+
+    if isfield(tbl1.params(1,1).block, 'posShiftForCode')
+        posShiftForCode = tbl1.params(1,1).block.posShiftForCode;   % UPDATE to 50000 once you switch the ex files over
+        maxDotOffsetPix = 5000;    % generous bound - well beyond any realistic screen half-width
+        isPosCode = allCodes > (posShiftForCode - maxDotOffsetPix) & ...
+                    allCodes < (posShiftForCode + maxDotOffsetPix);
+        
+        stimPositions = cellfun(@(q) extractStimPositions(q, posShiftForCode), tbl1.trialcodes, 'uni', 0);
+        if any(cellfun(@(q) ~isempty(q), stimPositions))
+            tbl.stimPos = stimPositions;
+        end
+        eventCodes = num2cell(allCodes(~isPosCode)');
+    else
+        eventCodes = num2cell(allCodes');
+    end
 
     eventNames = convertBetween_eventCodes_eventNames(eventCodes);
     trialMarkers = cellfun(@(t) cellfun(@(q,r) find(ismember(q,round(r(r(:,2)==t,3)*1000))), times_ms, tbl1.trialcodes, 'uni', 0), eventCodes, 'uni', 0)';
@@ -154,11 +161,11 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
     [~, idx] = sort(tbl.time_sec(:,1));
     tbl = tbl(idx,:);
 
-    try
-        [~, tbl] = handle_taskSpecifics(tbl, TASK_NAME);
-    catch
-        disp('------------- task-specific additions failed -------------');
-    end
+    % try
+    %     [~, tbl] = handle_taskSpecifics(tbl, TASK_NAME);
+    % catch
+    %     disp('------------- task-specific additions failed -------------');
+    % end
 
     %tbl.ns5_samps = tbl1.ns5_samps;
 
@@ -183,6 +190,94 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
 
     if ~isempty(LFP)
         tbl.lfp = LFP;
+    end
+
+end
+
+function xyPix = extractStimPositions(trialcodes, posShiftForCode)
+%EXTRACTDOTPOSITIONS Recover RF-map distractor (x,y) positions, in order, from a trial's codes.
+%   xyPix = extractDotPositions(trialcodes, posShiftForCode) takes a
+%   trial's code matrix (e.g. dat(n).trialcodes, or allCodes{n}.codes),
+%   with columns [~, code, time], finds every STIM_ON (code 10) event,
+%   and reads the two codes immediately following it as that flash's
+%   shifted (x,y) position. Returns an N x 2 matrix - one row per
+%   STIM_ON, in the order it occurred - with the shift removed so values
+%   are actual pixel offsets from screen center.
+%
+%   posShiftForCode must match whatever shift was used when the codes
+%   were generated (10000 for early sessions, 50000 going forward) -
+%   pass it explicitly, there's no way to auto-detect which was used.
+
+    STIM_ON = 10;
+
+    codeCol = trialcodes(:,2);
+    stimOnIdx = find(codeCol == STIM_ON);
+
+    xyPix = nan(numel(stimOnIdx), 2);
+
+    for k = 1:numel(stimOnIdx)
+        i = stimOnIdx(k);
+
+        if i+2 > numel(codeCol)
+            warning('extractDotPositions:truncated', ...
+                'STIM_ON at row %d has no room for two position codes after it - skipping.', i);
+            continue;
+        end
+
+        xCode = codeCol(i+1);
+        yCode = codeCol(i+2);
+
+        % sanity check - a real position code should sit near the shift,
+        % not equal another known event code (e.g. 40 = STIM_OFF), which
+        % would mean the trial got cut short right after STIM_ON
+        if xCode == 40 || yCode == 40
+            warning('extractDotPositions:unexpectedCode', ...
+                'STIM_ON at row %d is not followed by two position codes - skipping.', i);
+            continue;
+        end
+
+        xyPix(k,:) = [xCode - posShiftForCode, yCode - posShiftForCode];
+    end
+
+end
+
+function tbl1 = reformatMultiTaskBlock(tbl1)
+%REFORMATMULTITASKBLOCK Collapse multi-task tbl1.params.block cell arrays
+%down to just the task that actually ran on each trial.
+%
+%   tbl1 = reformatMultiTaskBlock(tbl1) loops over every row of tbl1. For
+%   rows where tbl1.params(row,1).block is a cell array (one struct per
+%   interleaved task), it parses 'taskNum=N' out of tbl1.text{row} and
+%   replaces tbl1.params(row,1).block with tbl1.params(row,1).block{N} -
+%   i.e., just the block struct for whichever task actually ran on that
+%   trial. Rows where .block is already a plain struct (single-task
+%   sessions) are left untouched.
+
+    for i = 1:height(tbl1)
+
+        blockVal = tbl1.params(i,1).block;
+
+        if ~iscell(blockVal)
+            continue
+        end
+
+        taskNumTok = regexp(tbl1.text{i}, 'taskNum=(\d+)', 'tokens', 'once');
+        if isempty(taskNumTok)
+            warning('reformatMultiTaskBlock:noTaskNum', ...
+                'Row %d: block is a cell array but no taskNum found in tbl1.text - leaving unchanged.', i);
+            continue
+        end
+        taskNum = str2double(taskNumTok{1});
+
+        if taskNum < 1 || taskNum > numel(blockVal)
+            warning('reformatMultiTaskBlock:badTaskNum', ...
+                'Row %d: taskNum=%d is out of range for a %d-element block cell array - leaving unchanged.', ...
+                i, taskNum, numel(blockVal));
+            continue
+        end
+
+        tbl1.params(i,1).block = blockVal{taskNum};
+
     end
 
 end

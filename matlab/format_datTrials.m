@@ -175,7 +175,7 @@ function [dat, dat_iti, epochEnd, tempdata, channels] = format_datTrials(nev, ou
 
             % Extract trial result
             event = uint32(trialdig);
-            dat(n).result = event(event(:, 2) >= 160 & event(:, 2) <= 165, 2);
+            dat(n).result = event(event(:, 2) >= 160 & event(:, 2) <= 167, 2);
             if isempty(dat(n).result)
                 dat(n).result = event(event(:, 2) >= 150 & event(:, 2) <= 158, 2);
             end
@@ -206,19 +206,19 @@ function [dat, dat_iti, epochEnd, tempdata, channels] = format_datTrials(nev, ou
             %dat(n).ns5_samps = ns5_rng([trialstarts_samp(n),trialends_samp(n)]);
 
             % Extract and process eye data
-            if ~isempty(eye_channel_labels)
-                [dat(n).eyedata, dat(n).pupil, dat(n).diode] = extract_eye_pupil_diode(out_ns5, ...
-                    ns5_rng(trialstarts_samp(n):trialends_samp(n)), dat(n).params, eye_channels, pupil_channel, diode_channel);
-            end
-            
-            % Process neural spikes, if applicable
-            if ~isempty(neural_channels)
-                [spks_byUnit, netLabels_byUnit] = extract_spikes_byUnit(this_trial, neural_channels, channels, trialstarts(n), spike_sort);
-                dat(n).(sprintf('spiketimes_%d', probe_index)) = spks_byUnit; % Store spike times
-                if spike_sort
-                    dat(n).(sprintf('netlabels_%d', probe_index)) = netLabels_byUnit; % Store spike sorting labels
-                end
-            end
+            % if ~isempty(eye_channel_labels)
+            %     [dat(n).eyedata, dat(n).pupil, dat(n).diode] = extract_eye_pupil_diode(out_ns5, ...
+            %         ns5_rng(trialstarts_samp(n):trialends_samp(n)), dat(n).params, eye_channels, pupil_channel, diode_channel);
+            % end
+            % 
+            % % Process neural spikes, if applicable
+            % if ~isempty(neural_channels)
+            %     [spks_byUnit, netLabels_byUnit] = extract_spikes_byUnit(this_trial, neural_channels, channels, trialstarts(n), spike_sort);
+            %     dat(n).(sprintf('spiketimes_%d', probe_index)) = spks_byUnit; % Store spike times
+            %     if spike_sort
+            %         dat(n).(sprintf('netlabels_%d', probe_index)) = netLabels_byUnit; % Store spike sorting labels
+            %     end
+            % end
 
             % INTERTRIAL-INTERVALS
             if n < numel(trialstarts)
@@ -232,19 +232,19 @@ function [dat, dat_iti, epochEnd, tempdata, channels] = format_datTrials(nev, ou
                 dat_iti(n).params.block = dat(n).params.block;
     
                 % Extract and process eye data
-                if ~isempty(eye_channel_labels)
-                    [dat_iti(n).eyedata, dat_iti(n).pupil, dat_iti(n).diode] = extract_eye_pupil_diode(out_ns5, ...
-                        ns5_rng(trialends_samp(n)+1:trialstarts_samp(n+1)-1), dat_iti(n).params, eye_channels, pupil_channel, diode_channel);
-                end
-                
-                % Process neural spikes, if applicable
-                if ~isempty(neural_channels)
-                    [spks_byUnit, netLabels_byUnit] = extract_spikes_byUnit(this_trial, neural_channels, channels, trialends(n)+(1/Fs), spike_sort);
-                    dat_iti(n).(sprintf('spiketimes_%d', probe_index)) = spks_byUnit; % Store spike times
-                    if spike_sort
-                        dat_iti(n).(sprintf('netlabels_%d', probe_index)) = netLabels_byUnit; % Store spike sorting labels
-                    end
-                end
+                % if ~isempty(eye_channel_labels)
+                %     [dat_iti(n).eyedata, dat_iti(n).pupil, dat_iti(n).diode] = extract_eye_pupil_diode(out_ns5, ...
+                %         ns5_rng(trialends_samp(n)+1:trialstarts_samp(n+1)-1), dat_iti(n).params, eye_channels, pupil_channel, diode_channel);
+                % end
+                % 
+                % % Process neural spikes, if applicable
+                % if ~isempty(neural_channels)
+                %     [spks_byUnit, netLabels_byUnit] = extract_spikes_byUnit(this_trial, neural_channels, channels, trialends(n)+(1/Fs), spike_sort);
+                %     dat_iti(n).(sprintf('spiketimes_%d', probe_index)) = spks_byUnit; % Store spike times
+                %     if spike_sort
+                %         dat_iti(n).(sprintf('netlabels_%d', probe_index)) = netLabels_byUnit; % Store spike sorting labels
+                %     end
+                % end
             end
 
     

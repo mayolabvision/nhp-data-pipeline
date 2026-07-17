@@ -129,7 +129,7 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
     nevpath = nevpaths{nevnum};
     this_task = tasks{nevnum};
 
-    fprintf('\n---- generating nev_out for %s ----\n', this_task);
+    fprintf('\n---- generating nev_out for %s ----\n', nevnames{nevnum});
 
     %------------------------------------- NEUROPIXELS -------------------------------------%
     % Aligns ripple (nev/ns5) trial timestamps to imec/nidq sync pulses so
@@ -174,114 +174,95 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
         np_win_sec = [these_alignTimes(1), these_alignTimes(1)+(numel(eye_times)/1000)] - 1;
         eye_times = eye_times + (these_alignTimes(1) - alignTimes(1));
 
-        tbl = convert_smithDat_mayoTbl(dat, dat_iti, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH, 'INCLUDE_ITI', INCLUDE_ITI);
+        tbl = convert_smithDat_mayoTbl(dat, dat_iti, 'HELPERS_PATH', HELPERS_PATH, 'INCLUDE_ITI', INCLUDE_ITI);
     
     %------------------------------------- PLEXON -------------------------------------%
     % Handles multi-electrode plexon arrays; runs nasnet spike-sorting
     % (per hardware config / electrode group) when NET_PATH is set and no
     % SORTER_HASH override is given, otherwise extracts unsorted data.
     elseif ismember('plexon',metadata.probe_type)
-        % 'fstm'/'fast' tasks are handled without spike-sorting
-        if any(contains(this_task, {'fstm', 'fast'}))
-            [nev, out_ns5, ~] = extract_nevout(nevpath);
-            if ~isempty(nev)
-                [dat, dat_iti, ~, tempdata, ~] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ... 
-                                        'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
-                prev_tempdata = tempdata;
-                tbl = convert_smithDat_mayoTbl(dat, dat_iti, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH, 'INCLUDE_ITI', INCLUDE_ITI);
-                tbl = removevars(tbl, 'time_sec');
-            end
-        else
-            % Run nasnet spike-sorting per hardware config (elecA-D map to
-            % contiguous 128-channel blocks) and build cluster metadata tables
-            if ~isempty(NET_PATH) & isempty(SORTER_HASH)
-                addpath(genpath(NET_PATH));
+        % Run nasnet spike-sorting per hardware config (elecA-D map to
+        % contiguous 128-channel blocks) and build cluster metadata tables
+        if ~isempty(NET_PATH) & isempty(SORTER_HASH)
+            addpath(genpath(NET_PATH));
 
-                [nev, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', true, 'netFolder', fullfile(NET_PATH,'networks'), 'READ_LFP', false);
+            [nev, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', true, 'netFolder', fullfile(NET_PATH,'networks'), 'READ_LFP', false);
 
-                [dat, dat_iti, ~, tempdata, ~] = format_datTrials(nev, out_ns5, 'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
+            [dat, dat_iti, ~, tempdata, ~] = format_datTrials(nev, out_ns5, 'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
 
-                sorting_all = [];
-                for probe = 1:numel(metadata.hardware_config)
-                    sorting.probe_index = probe;
-                    % Map hardware config label to its 128-channel block
-                    neural_chans = electrode_group_channels(metadata.hardware_config{probe});
+            sorting_all = [];
+            for probe = 1:numel(metadata.hardware_config)
+                sorting.probe_index = probe;
+                % Map hardware config label to its 128-channel block
+                neural_chans = electrode_group_channels(metadata.hardware_config{probe});
 
-                    [dat2, dat_iti, ~, ~, chans] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ...
-                                    'NEURAL_CHANNELS', neural_chans, 'PROBE_INDEX', probe, ...
-                                    'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
-
-                    % Build per-cluster metadata table (best channel, sort code, probe geometry, etc.)
-                    chans_tbl = build_nasnet_clusters_table(chans, metadata, probe);
-                    sorting.clusters = categoricalize_columns(chans_tbl);
-                    sorting_all = [sorting_all; sorting];
-
-                    fieldsToCopy = {sprintf('spiketimes_%d', probe), sprintf('netlabels_%d', probe)};
-                    for f = fieldsToCopy
-                        [dat.(f{1})] = deal(dat2.(f{1}));
-                    end
-                end
-
-                if nevnum==1
-                    S1.sorting = sorting_all;
-                end
-                
-                prev_tempdata = tempdata;
-                tbl = convert_smithDat_mayoTbl(dat, dat_iti, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH, 'INCLUDE_ITI', INCLUDE_ITI);
-                tbl = removevars(tbl, 'time_sec');
-            else
-                % No nasnet sorting requested (or a SORTER_HASH override will
-                % supply sorting later) - just extract unsorted trial data,
-                % accumulating a running time offset across files
-                [nev, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', false);
-
-                [dat, dat_iti, ~, tempdata, ~] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ...
+                [dat2, dat_iti, ~, ~, chans] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ...
+                                'NEURAL_CHANNELS', neural_chans, 'PROBE_INDEX', probe, ...
                                 'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
 
-                prev_tempdata = tempdata;
-                tbl = convert_smithDat_mayoTbl(dat, dat_iti, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH, 'INCLUDE_ITI', INCLUDE_ITI);
-                tbl.time_sec = tbl.time_sec+rip_time_start;
-                rip_time_start = rip_time_start + double(out_ns5.hdr.nSamples/out_ns5.hdr.Fs);
-           end
-        end
+                % Build per-cluster metadata table (best channel, sort code, probe geometry, etc.)
+                chans_tbl = build_nasnet_clusters_table(chans, metadata, probe);
+                sorting.clusters = categoricalize_columns(chans_tbl);
+                sorting_all = [sorting_all; sorting];
+
+                fieldsToCopy = {sprintf('spiketimes_%d', probe), sprintf('netlabels_%d', probe)};
+                for f = fieldsToCopy
+                    [dat.(f{1})] = deal(dat2.(f{1}));
+                end
+            end
+
+            if nevnum==1
+                S1.sorting = sorting_all;
+            end
+            
+            prev_tempdata = tempdata;
+            tbl = convert_smithDat_mayoTbl(dat, dat_iti, 'HELPERS_PATH', HELPERS_PATH, 'INCLUDE_ITI', INCLUDE_ITI);
+            tbl = removevars(tbl, 'time_sec');
+        else
+            % No nasnet sorting requested (or a SORTER_HASH override will
+            % supply sorting later) - just extract unsorted trial data,
+            % accumulating a running time offset across files
+            [nev, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', false);
+
+            [dat, dat_iti, ~, tempdata, ~] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ...
+                            'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
+
+            prev_tempdata = tempdata;
+            tbl = convert_smithDat_mayoTbl(dat, dat_iti, 'HELPERS_PATH', HELPERS_PATH, 'INCLUDE_ITI', INCLUDE_ITI);
+            tbl.time_sec = tbl.time_sec+rip_time_start;
+            rip_time_start = rip_time_start + double(out_ns5.hdr.nSamples/out_ns5.hdr.Fs);
+       end
+      
     %------------------------------------- FHC SINGLE ELECTRODE -------------------------------------%
     % Single-electrode FHC recordings; each file corresponds to one unit,
     % so channel/cluster metadata accumulates across files and is
     % finalized once the last file has been processed.
     elseif ismember('fhc',metadata.probe_type)
-        if any(contains(this_task, {'fstm', 'fast'}))
-            [nev, out_ns5, ~] = extract_nevout(nevpath);
-            if ~isempty(nev)
-                [dat, dat_iti, ~, tempdata, ~] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ... 
-                                        'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
-            end
-        else
-            addpath(genpath(NET_PATH));
+        addpath(genpath(NET_PATH));
 
-            [nev, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', true, 'netFolder', fullfile(NET_PATH,'networks'));
+        [nev, out_ns5, ~] = extract_nevout(nevpath, 'SPIKE_SORT', true, 'netFolder', fullfile(NET_PATH,'networks'));
 
-            % Hardware config encodes electrode group + channel (e.g. 'elecA_12');
-            % map that to an absolute neural channel index
-            hw_config = metadata.hardware_config{1};
-            parts = strsplit(hw_config, '_');
-            this_hw = parts{1};
-            this_chan = str2double(parts{2});
-            neural_chan = electrode_group_offset(this_hw) + this_chan;
+        % Hardware config encodes electrode group + channel (e.g. 'elecA_12');
+        % map that to an absolute neural channel index
+        hw_config = metadata.hardware_config{1};
+        parts = strsplit(hw_config, '_');
+        this_hw = parts{1};
+        this_chan = str2double(parts{2});
+        neural_chan = electrode_group_offset(this_hw) + this_chan;
 
-            [dat, dat_iti, ~, tempdata, chans] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ...
-                                                  'NEURAL_CHANNELS', neural_chan, 'EYE_CHAN_LABELS', eye_chan_labels, ...
-                                                  'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
-            probe = 1;
-            if nevnum==1
-                sorting.probe_index = probe;
-                S1.sorting = sorting;
-                chans_tbl_all = [];
-            end
+        [dat, dat_iti, ~, tempdata, chans] = format_datTrials(nev, out_ns5, 'PREV_TEMPDATA', prev_tempdata, ...
+                                              'NEURAL_CHANNELS', neural_chan, 'EYE_CHAN_LABELS', eye_chan_labels, ...
+                                              'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
+        probe = 1;
+        if nevnum==1
+            sorting.probe_index = probe;
+            S1.sorting = sorting;
+            chans_tbl_all = [];
+        end
 
-            chans_tbl = build_fhc_clusters_row(this_task, chans, metadata, probe);
-            chans_tbl_all = [chans_tbl_all; chans_tbl];
-
-        end   
+        chans_tbl = build_fhc_clusters_row(this_task, chans, metadata, probe);
+        chans_tbl_all = [chans_tbl_all; chans_tbl];
+ 
  
         % On the last file, deduplicate and finalize the accumulated
         % per-unit cluster metadata table into S1.sorting.clusters
@@ -293,7 +274,7 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
         [~, fname, ~] = fileparts(nevpath);   % 'kendra_scrappy_0066a_mdir1'
         this_task = erase(fname, session_name); % 'a_mdir1'
 
-        tbl = convert_smithDat_mayoTbl(dat, dat_iti, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH, 'INCLUDE_ITI', INCLUDE_ITI);
+        tbl = convert_smithDat_mayoTbl(dat, dat_iti, 'HELPERS_PATH', HELPERS_PATH, 'INCLUDE_ITI', INCLUDE_ITI);
         tbl = removevars(tbl, 'time_sec');
 
     %------------------------------------- BEHAVIOR ONLY -------------------------------------%
@@ -303,8 +284,8 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
         [nev, out_ns5, ~] = extract_nevout(nevpath);
         if ~isempty(nev)
             [dat, dat_iti, ~, ~, ~] = format_datTrials(nev, out_ns5, 'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
-            tbl = convert_smithDat_mayoTbl(dat, dat_iti, 'TASK_NAME', this_task, 'HELPERS_PATH', HELPERS_PATH, 'INCLUDE_ITI', INCLUDE_ITI);
-            tbl = removevars(tbl, 'time_sec');
+            tbl = convert_smithDat_mayoTbl(dat, dat_iti, 'HELPERS_PATH', HELPERS_PATH, 'INCLUDE_ITI', INCLUDE_ITI);
+            % tbl = removevars(tbl, 'time_sec');
         else
             dat = []; tbl = [];
         end
@@ -404,8 +385,8 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
     % parameters (merged across trials), the ns5 header, raw dat struct,
     % and the final trial table
     if ~isempty(tbl)
-        merged_struct = merge_taskParams(tbl);
-        S1.(this_task).params = merged_struct;
+        % merged_struct = merge_taskParams(tbl);
+        S1.(this_task).params = dat(1).params.block;
     end
     S1.(this_task).hdr = out_ns5.hdr;
 
