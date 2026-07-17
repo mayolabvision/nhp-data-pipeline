@@ -488,21 +488,27 @@ for i = 1:numel(nevnames)
     tasks{i} = match_task_keyword(nevnames{i}, task_keywords);
 end
 
-% Reduce tagged task names (e.g. 'fstm01') down to their task type (e.g. 'fstm')
-taskTypes = unique(cellfun(@(q) regexp(q, '[a-zA-Z]+', 'match', 'once'), tasks, 'uni', 0));
+% Reduce tagged task names (e.g. 'fstm01', 'mdir-purs1') down to their task
+% type (e.g. 'fstm', 'mdir-purs') by stripping the trailing digits
+taskTypes = unique(cellfun(@(q) regexprep(q, '\d+$', ''), tasks, 'uni', 0));
 disp(tasks)
 
 end
 
 function task = match_task_keyword(name, task_keywords)
-%MATCH_TASK_KEYWORD  Return the first task keyword (+ trailing chars) found in name, or 'unknown'.
+%MATCH_TASK_KEYWORD  Return the task token (keyword + trailing/hyphenated chars)
+%   that starts earliest in name, or 'unknown'. Filenames can chain multiple
+%   task keywords with a hyphen (e.g. 'mdir-purs1'), so keywords are not
+%   checked in list order -- the leftmost match in the name wins, and the
+%   match is allowed to span hyphens so the full compound token is kept.
 task = 'unknown';
+best_start = Inf;
 for j = 1:numel(task_keywords)
-    pattern = [task_keywords{j}, '\w*'];
-    match = regexp(name, pattern, 'match', 'once');
-    if ~isempty(match)
+    pattern = [task_keywords{j}, '[\w-]*'];
+    [start_idx, match] = regexp(name, pattern, 'start', 'match', 'once');
+    if ~isempty(match) && start_idx < best_start
+        best_start = start_idx;
         task = match;
-        return
     end
 end
 end
