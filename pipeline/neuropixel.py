@@ -204,43 +204,23 @@ class NeuropixelProfile(RecordingProfile):
                 plot_probe_motion(self)
                 print(f"===== probe motion w/ cutoff plotted =====")
 
-        if any(custom_sorter_params.get(k) == 666 for k in ('whitening_range', 'nearest_chans', 'dmin', 'dminx', 'min_template_size')):
+        if custom_sorter_params.get('whitening_range') == 666 or custom_sorter_params.get('nearest_chans') == 666:
             prb = recording.get_probe().to_dataframe()
+            prb = prb.sort_values('y')
+            yp = np.diff(prb.y.values)
+            ypitch = yp[yp > 0].min()
 
-            # vertical pitch (dmin)
-            yp = np.diff(np.sort(prb.y.values))
-            abs_yp = np.abs(yp[(yp != 0) & (np.abs(yp) <= 100)])
-            yvals, ycounts = np.unique(abs_yp, return_counts=True)
-            ypitch = yvals[ycounts.argmax()]
-
-            # horizontal pitch (dminx)
-            xp = np.diff(np.sort(np.unique(prb.x.values)))
-            abs_xp = np.abs(xp[xp != 0])
-            xvals, xcounts = np.unique(abs_xp, return_counts=True)
-            xpitch = xvals[xcounts.argmax()] if abs_xp.size > 0 else ypitch
-
-            print(f"ypitch = {ypitch}, xpitch = {xpitch}")
-
-            if custom_sorter_params.get('dmin') == 666:
-                custom_sorter_params['dmin'] = float(ypitch)
-
-            if custom_sorter_params.get('dminx') == 666:
-                custom_sorter_params['dminx'] = float(xpitch)
-
-            dmin  = custom_sorter_params.get('dmin',  ypitch)
-            dminx = custom_sorter_params.get('dminx', xpitch)
-
-            if custom_sorter_params.get('min_template_size') == 666:
-                template_sizes = custom_sorter_params.get('template_sizes', 6)
-                sig = max(min(dmin, dminx) / 2,
-                          max(dmin, dminx) / template_sizes)
-                custom_sorter_params['min_template_size'] = round(sig, 2)
+            print(f"ypitch = {ypitch}")
 
             if custom_sorter_params.get('whitening_range') == 666:
-                custom_sorter_params['whitening_range'] = int(round(32 * 20 / dmin))
+                custom_sorter_params['whitening_range'] = int(round(32 * 20 / ypitch))
 
             if custom_sorter_params.get('nearest_chans') == 666:
-                custom_sorter_params['nearest_chans'] = int(round(16 * 20 / dmin))
+                custom_sorter_params['nearest_chans'] = int(round(16 * 20 / ypitch))
+
+            for k in ('whitening_range', 'nearest_chans'):
+                if k in self.protocol['sorting']:
+                    self.protocol['sorting'][k] = custom_sorter_params[k]
 
         print("--------------------------------------------------")
         print(custom_sorter_params)
