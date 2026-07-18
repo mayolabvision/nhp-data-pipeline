@@ -310,7 +310,8 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
         hashes = split(SORTER_HASH, '-');
         preprocess_hash = hashes{1}; pp_hash = hashes{2}; motion_hash = hashes{3}; %sorter_hash = hashes{4};
 
-        sorting_all = []; spike_times = cell(numel(metadata.probe_type),1);
+        sorting_all = []; 
+        spike_times = cell(numel(metadata.probe_type),1);
         for probe = 1:numel(metadata.probe_type)
 
             si_path = fullfile(RAW_PATH, session_name, [session_name, '_', metadata.hardware_config{probe}], 'sorting', SORTER_HASH);
@@ -359,6 +360,10 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
             % since it is shared across all tasks/files for this probe
             if nevnum==1
                 sorting.probe_index = probe;
+                if isequal(metadata.probe_type{probe},'neuropixel')
+                    sorting.ap_meta = ap_meta;
+                    sorting.lfp_meta = lfp_meta; 
+                end
                 fields = fieldnames(sorting);
                 fields(strcmp(fields, 'probe_index')) = [];
                 sorting = orderfields(sorting, ['probe_index'; fields]);
@@ -374,7 +379,7 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
                 sorting.clusters = movevars(sorting.clusters,{'probe_index'},'After','sess_name');
                 sorting.clusters = categoricalize_columns(sorting.clusters);
 
-                motion_path = fullfile(RAW_PATH, session_name, [session_name, '_', metadata.hardware_config{probe}], 'preprocess', preprocess_hash, pp_hash, motion_hash);
+                % motion_path = fullfile(RAW_PATH, session_name, [session_name, '_', metadata.hardware_config{probe}], 'preprocess', preprocess_hash, pp_hash, motion_hash);
 
                 sorting_all = [sorting_all; sorting];
             end
