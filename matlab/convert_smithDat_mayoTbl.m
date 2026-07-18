@@ -140,9 +140,26 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
 
     tbl.text = tbl1.text;
     tbl.text(tbl.result=='NaN') = {''};
+    if ismember('FIXATE', tbl.Properties.VariableNames) && ~iscell(tbl.FIXATE), tbl.FIXATE = num2cell(tbl.FIXATE); end
 
     tbl.params = tbl1.params;
+    
+    % Add filtered eye traces and kinematic derivatives
     tbl.eyedata = tbl1.eyedata; tbl.pupil = tbl1.pupil; tbl.diode = tbl1.diode;
+
+    eyePos = cell(height(tbl),1);
+    for i = 1:height(tbl)
+        eyedata = tbl.eyedata{i};
+        if size(tbl.eyedata{i},2) > 20
+            eyePos{i} = filterEyeTraces_EyeLink(eyedata);
+        else
+            eyePos_temp = filterEyeTraces_EyeLink([tbl.eyedata{i-1} tbl.eyedata{i}]);
+            eyePos{i} = eyePos_temp(:,(end-size(tbl.eyedata{i},2)+1):end);
+        end
+    end
+    
+    [eyeVel, eyeAcc] = cellfun(@(x) calcDerivative_eyeTraces(x), eyePos, 'uni', 0);
+    tbl.eyePos = eyePos; tbl.eyeVel = eyeVel; tbl.eyeAcc = eyeAcc;
 
     if ismember('ALIGN_PULSE', tbl.Properties.VariableNames)
         if INCLUDE_ITI
@@ -160,12 +177,6 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
 
     [~, idx] = sort(tbl.time_sec(:,1));
     tbl = tbl(idx,:);
-
-    % try
-    %     [~, tbl] = handle_taskSpecifics(tbl, TASK_NAME);
-    % catch
-    %     disp('------------- task-specific additions failed -------------');
-    % end
 
     %tbl.ns5_samps = tbl1.ns5_samps;
 
@@ -190,6 +201,13 @@ function tbl = convert_smithDat_mayoTbl(dat,dat_iti,varargin)
 
     if ~isempty(LFP)
         tbl.lfp = LFP;
+    end
+
+    if ismember('ALIGN_PULSE', tbl.Properties.VariableNames)
+        tbl = movevars(tbl,{'ALIGN_PULSE'}, 'After','START_TRIAL');
+    end
+    if ismember('IGNORED', tbl.Properties.VariableNames) && ismember('CORRECT', tbl.Properties.VariableNames)
+        tbl = movevars(tbl,{'IGNORED'},'After','CORRECT');
     end
 
 end

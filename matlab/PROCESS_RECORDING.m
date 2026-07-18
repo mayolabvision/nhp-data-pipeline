@@ -155,8 +155,8 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
         end
 
         [np_mask, ripple_mask] = match_syncPulses_RipToNP(np_pulse_timeStamps, ripple_pulse_timeStamps);
-        fprintf('\n dat has %d rows\n', numel(dat))
-        fprintf('np_mask = %d/%d, ripple_mask = %d/%d \n', sum(np_mask), length(np_mask), sum(ripple_mask), length(ripple_mask))  
+        % fprintf('\n dat has %d rows\n', numel(dat))
+        % fprintf('np_mask = %d/%d, ripple_mask = %d/%d \n', sum(np_mask), length(np_mask), sum(ripple_mask), length(ripple_mask))  
 
         if contains(session_name, 'kendra_scrappy_0136a') 
             [dat,these_alignTimes,goodFlag] = fix_specificSessions(session_name,np_mask,ripple_mask,alignTimes,dat,goodFlag);
@@ -285,10 +285,16 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
         if ~isempty(nev)
             [dat, dat_iti, ~, ~, ~] = format_datTrials(nev, out_ns5, 'EYE_CHAN_LABELS', eye_chan_labels, 'DIODE_CHAN_LABEL', diode_chan_label, 'PUPIL_CHAN_LABEL', pupil_chan_label);
             tbl = convert_smithDat_mayoTbl(dat, dat_iti, 'HELPERS_PATH', HELPERS_PATH, 'INCLUDE_ITI', INCLUDE_ITI);
-            % tbl = removevars(tbl, 'time_sec');
+            tbl = removevars(tbl, 'time_sec');
         else
             dat = []; tbl = [];
         end
+    end
+
+    %------------------------------------- TASK-SPECIFIC ADDITIONS -------------------------------------%
+    % Extras/changes based on xmlName
+    if ~isempty(tbl)
+        [~, tbl] = handle_taskSpecifics(tbl);
     end
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
