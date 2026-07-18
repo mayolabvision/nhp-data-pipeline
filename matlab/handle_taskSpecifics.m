@@ -2,8 +2,7 @@ function [tbl,taskNickname] = handle_taskSpecifics(in_tbl)
 % handle_taskSpecifics
 %
 % USAGE:
-%   task_keywords = handle_taskSpecifics();
-%   [task_keywords, newTbl, taskNickname] = handle_taskSpecifics(tbl);
+%   [newTbl, taskNickname] = handle_taskSpecifics(tbl);
 %
 % Splits tbl by its unique xmlName values (since a single table can mix
 % trials from multiple tasks, e.g. interleaved multi-task blocks), runs
@@ -15,6 +14,8 @@ function [tbl,taskNickname] = handle_taskSpecifics(in_tbl)
 % taskNickname is the hyphen-joined short nickname for whichever tasks
 % are present in tbl.xmlName (e.g. a table mixing dirmem and pursuit
 % trials returns 'mdir-purs'); see the task_nicknames dictionary below.
+% xmlNames not found in that dictionary are passed through unchanged as
+% their own nickname.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -65,8 +66,9 @@ taskNickname = strjoin(unique(nicknames, 'stable'), '-');
 end
 
 function nickname = lookupNickname(taskName, task_nicknames)
-%LOOKUPNICKNAME  Look up taskName's short nickname in the task_nicknames dictionary.
-nickname = 'unknown';
+%LOOKUPNICKNAME  Look up taskName's short nickname in the task_nicknames
+%   dictionary; if taskName isn't recognized, return it unchanged.
+nickname = taskName;
 for r = 1:size(task_nicknames, 1)
     if ismember(taskName, task_nicknames{r,2})
         nickname = task_nicknames{r,1};

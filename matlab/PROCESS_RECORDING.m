@@ -112,7 +112,7 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Parsing and ordering tasks in chronological order
-[nevnames, nevpaths, tasks, taskTypes] = parse_and_order_tasks(filePattern);
+[nevnames, nevpaths] = parse_and_order_tasks(filePattern);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Extracting Ripple data from nev/ns5 datafiles
@@ -123,11 +123,11 @@ end
 % channel-metadata logic before converting to a common table format.
 tic
 
-rip_time_start = 0; goodFlag = true;
+rip_time_start = 0; goodFlag = true; taskTypes = cell(1,length(nevnames));
 prev_tempdata = struct([]);
 for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
     nevpath = nevpaths{nevnum};
-    this_task = tasks{nevnum};
+    % this_task = tasks{nevnum};
 
     fprintf('\n---- generating nev_out for %s ----\n', nevnames{nevnum});
 
@@ -294,7 +294,9 @@ for nevnum = 1:length(nevnames) % loop through nev files, in chronological order
     %------------------------------------- TASK-SPECIFIC ADDITIONS -------------------------------------%
     % Extras/changes based on xmlName
     if ~isempty(tbl)
-        [~, tbl] = handle_taskSpecifics(tbl);
+        [tbl,this_task] = handle_taskSpecifics(tbl);
+        taskTypes{nevnum} = this_task;
+        this_task = uniqueTaskFieldName(S1, this_task);
     end
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -416,7 +418,7 @@ end
 %   <session>-<short_sorter_id>.mat  when SORTER_HASH is set
 %   <session>-nasnet.mat             when NET_PATH (nasnet) sorting was used
 %   <session>.mat                    otherwise (unsorted / behavior-only)
-S = unify_taskTables(S1,taskTypes);
+S = unify_taskTables(S1,unique(taskTypes));
 
 if ~exist(fullfile(OUT_PATH, session_name, 'tables'), 'dir'), mkdir(fullfile(OUT_PATH, session_name, 'tables')); end
 
@@ -439,7 +441,7 @@ fprintf('\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [nevnames, nevpaths, tasks, taskTypes] = parse_and_order_tasks(filePattern)
+function [nevnames, nevpaths] = parse_and_order_tasks(filePattern)
 %PARSE_AND_ORDER_TASKS  Discover .ns5 files, sort chronologically, and tag each with a task name.
 %   [nevnames, nevpaths, tasks, taskTypes] = parse_and_order_tasks(filePattern)
 %
@@ -466,20 +468,43 @@ nevnames = nevnames(idx);
 nevpaths = raw_filepaths(idx);
 
 % Define possible task keywords
-task_keywords = handle_taskSpecifics();
+% task_keywords = handle_taskSpecifics();
+% 
+% % Tag each .ns5 file with a task name by matching against known task
+% % keywords (e.g. 'fstm01', 'unit03'); files that match nothing are 'unknown'
+% tasks = cell(size(nevnames));
+% for i = 1:numel(nevnames)
+%     tasks{i} = match_task_keyword(nevnames{i}, task_keywords);
+% end
+% 
+% % Reduce tagged task names (e.g. 'fstm01', 'mdir-purs1') down to their task
+% % type (e.g. 'fstm', 'mdir-purs') by stripping the trailing digits
+% taskTypes = unique(cellfun(@(q) regexprep(q, '\d+$', ''), tasks, 'uni', 0));
+% disp(tasks)
 
-% Tag each .ns5 file with a task name by matching against known task
-% keywords (e.g. 'fstm01', 'unit03'); files that match nothing are 'unknown'
-tasks = cell(size(nevnames));
-for i = 1:numel(nevnames)
-    tasks{i} = match_task_keyword(nevnames{i}, task_keywords);
 end
 
-% Reduce tagged task names (e.g. 'fstm01', 'mdir-purs1') down to their task
-% type (e.g. 'fstm', 'mdir-purs') by stripping the trailing digits
-taskTypes = unique(cellfun(@(q) regexprep(q, '\d+$', ''), tasks, 'uni', 0));
-disp(tasks)
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function fieldName = uniqueTaskFieldName(S, nickname)
+%UNIQUETASKFIELDNAME  Append the next available integer suffix to nickname
+%   so it doesn't collide with an existing field of S. The first file for
+%   a given nickname (e.g. 'rfmp') always gets '1'; on later files sharing
+%   that nickname, this finds whatever numbered fields already exist
+%   (rfmp1, rfmp2, ...) and picks max+1.
+%   Struct field names must be valid MATLAB identifiers, so any
+%   non-identifier characters in nickname (e.g. the '-' in a multi-task
+%   nickname like 'mdir-purs') are replaced with '_' first.
+nickname = regexprep(nickname, '[^a-zA-Z0-9_]', '_');
+existing = fieldnames(S);
+pat = ['^' regexptranslate('escape', nickname) '(\d+)$'];
+maxNum = 0;
+for i = 1:numel(existing)
+    tok = regexp(existing{i}, pat, 'tokens', 'once');
+    if ~isempty(tok)
+        maxNum = max(maxNum, str2double(tok{1}));
+    end
+end
+fieldName = sprintf('%s%d', nickname, maxNum + 1);
 end
 
 function task = match_task_keyword(name, task_keywords)
