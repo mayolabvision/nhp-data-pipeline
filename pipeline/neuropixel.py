@@ -204,27 +204,56 @@ class NeuropixelProfile(RecordingProfile):
                 plot_probe_motion(self)
                 print(f"===== probe motion w/ cutoff plotted =====")
 
-        if custom_sorter_params.get('whitening_range') == 666 or custom_sorter_params.get('nearest_chans') == 666:
-            prb = recording.get_probe().to_dataframe()
-            prb = prb.sort_values('y')
-            yp = np.diff(prb.y.values)
-            ypitch = yp[yp > 0].min()
+        prb = recording.get_probe().to_dataframe()
+        prb = prb.sort_values('y')
 
-            print(f"ypitch = {ypitch}")
+        yp = np.diff(prb.y.values)
+        ypitch = float(yp[yp > 0].min())
 
-            if custom_sorter_params.get('whitening_range') == 666:
-                custom_sorter_params['whitening_range'] = int(round(32 * 20 / ypitch))
+        xvals = np.unique(prb.x.values)
+        xp = np.diff(np.sort(xvals))
+        xpitch = float(xp[xp > 0].min()) if len(xp[xp > 0]) > 0 else 0.0
 
-            if custom_sorter_params.get('nearest_chans') == 666:
-                custom_sorter_params['nearest_chans'] = int(round(16 * 20 / ypitch))
+        print(f"ypitch = {ypitch} um, xpitch = {xpitch} um")
 
-            for k in ('whitening_range', 'nearest_chans'):
-                if k in self.protocol['sorting']:
-                    self.protocol['sorting'][k] = custom_sorter_params[k]
+        def _n_chans_within(radius_um, xpitch, ypitch):
+            """Exact number of contacts within radius_um on a 2-column probe (Euclidean)."""
+            n_same = 2 * int(np.floor(radius_um / ypitch)) + 1
+            if 0 < xpitch < radius_um:
+                n_cross = 1 + 2 * int(np.floor(np.sqrt(radius_um**2 - xpitch**2) / ypitch))
+            else:
+                n_cross = 0
+            return n_same + n_cross
+
+        # nearest_chans and whitening_range: identical spatial footprint, reaching the
+        # cross-column contact displaced by 40 um vertically (~110.5 um for 103 um xpitch).
+        # Results: 16 chans at 20 um ypitch, 8 chans at 40 um ypitch.
+        n_chans = _n_chans_within(np.sqrt(xpitch**2 + 40.0**2), xpitch, ypitch)
+        if custom_sorter_params.get('nearest_chans') == 666:
+            custom_sorter_params['nearest_chans'] = int(n_chans)
+        if custom_sorter_params.get('whitening_range') == 666:
+            custom_sorter_params['whitening_range'] = int(n_chans)
+
+        if custom_sorter_params.get('min_template_size') == 666:
+            custom_sorter_params['min_template_size'] = int(round(ypitch / 2))
+
+        if custom_sorter_params.get('dminx') == 666:
+            custom_sorter_params['dminx'] = int(round(xpitch))
+
+        if custom_sorter_params.get('max_channel_distance') == 666:
+            custom_sorter_params['max_channel_distance'] = int(round(xpitch / 2 + ypitch))
+
+        geometry_params = ('nearest_chans', 'whitening_range', 'min_template_size',
+                           'dminx', 'max_channel_distance')
+        for k in geometry_params:
+            if k in self.protocol['sorting']:
+                self.protocol['sorting'][k] = custom_sorter_params[k]
 
         print("--------------------------------------------------")
         print(custom_sorter_params)
         print("--------------------------------------------------")
+            
+        save_params(self.figs_path / "params.json", self.protocol)
        
         if not (self.sorter_path / 'params.json').is_file():
                 
@@ -234,6 +263,7 @@ class NeuropixelProfile(RecordingProfile):
             
             save_params(self.data_path / "sorting" / self.full_hash / "params.json", 
                             self.protocol)
+            
             convert_npy_to_mat(self.sorter_path / 'sorter_output')
             print(f"✓ Spike sorting outputs saved: {self.sorter_path}")
         
@@ -286,7 +316,7 @@ class NeuropixelProfile(RecordingProfile):
         print(f"Loading in sorting analyzer......................")
         analyzer = load_sorting_analyzer(self.analyzer_path)
 
-        if not (Path(self.metrics_path) / "cluster_metrics666.csv").is_file(): 
+        if not (Path(self.metrics_path) / "cluster_metrics.csv").is_file(): 
             print(f"Computing quality metrics......................")
             metrics = compute_quality_metrics(
                     analyzer,
@@ -334,10 +364,10 @@ class NeuropixelProfile(RecordingProfile):
             metrics = pd.read_csv(Path(self.metrics_path) / "cluster_metrics.csv")      
             print("cluster_metrics already exists, loading in df")
 
-        print(f"Plotting analyzer summary and metrics......................")
-        if not (Path(self.figs_path) / "analyzer_summary.png").is_file(): 
-            plot_analyzer_sess(analyzer, metrics, self) 
-            print(f"===== analyzer session summary plotted =====")
+        #print(f"Plotting analyzer summary and metrics......................")
+        #if not (Path(self.figs_path) / "analyzer_summary.png").is_file(): 
+        #    plot_analyzer_sess(analyzer, metrics, self) 
+        #    print(f"===== analyzer session summary plotted =====")
         
         print(f"===================================================================")
         print("~~~~~~~~~~~~~PIPELINE STAGE 5: QUALITY METRICS CALCULATED~~~~~~~~~~~")

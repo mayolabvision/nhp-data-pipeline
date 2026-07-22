@@ -1,9 +1,9 @@
 #!/bin/bash -l
 #SBATCH --nodes=1
 #SBATCH --time=0-23:59:59
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:1
 #SBATCH --cluster=gpu
-#SBATCH --partition=a100
+#SBATCH --partition=a100_nvlink
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
 #SBATCH --job-name=sorting
