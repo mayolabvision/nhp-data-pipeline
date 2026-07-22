@@ -21,8 +21,9 @@ def save_params(params_path: Path, params: dict):
     """Save params dict to JSON file at params_path if the file does not already exist."""
     if not params_path.is_file():
         params_path.parent.mkdir(parents=True, exist_ok=True)  # ensure directory exists
-        with open(params_path, "w") as f:
-            json.dump(params, f, indent=4)
+    
+    with open(params_path, "w") as f:
+        json.dump(params, f, indent=4)
 
 def get_preprocess_hash(preprocessing_params: dict):
     # 1. Serialize the params with sorted keys for consistency

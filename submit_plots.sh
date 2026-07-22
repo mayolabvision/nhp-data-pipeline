@@ -31,7 +31,8 @@ HELPERS_PATH=$(python -c "import config; print(config.HELPERS_PATH)")
 echo "======================================================"
 
 SESSION="${1}"
-PROBE_ID="${2:-2}"
+PROBE_ID="${2:-0}"
+PROBE_ID=$((PROBE_ID + 1)) # to adapt to matlab indexing
 PROTOCOL="${3:-np-ks4}"
 
 echo "SESSION    =  $SESSION"
@@ -51,15 +52,14 @@ sorter_path, short_path = profile_to_mat('${SESSION}', protocol='${PROTOCOL}.jso
 print(sorter_path, short_path)
 ")
 
-SORTER_PATH=$(echo "$RESULT" | awk '{print $1}')
-SHORT_PATH=$(echo "$RESULT" | awk '{print $2}')
+SORTER_HASH=$(echo "$RESULT" | awk '{print $1}')
+SHORT_HASH=$(echo "$RESULT" | awk '{print $2}')
 
-echo "SORTER_PATH = '$SORTER_PATH'"
-echo "SHORT_PATH  = '$SHORT_PATH'"
+echo "SORTER_HASH = '$SORTER_HASH'"
 echo "======================================================"
 
-DATA_PATH="${RAW_DATA_PATH}/${SESSION}/tables/${SESSION}-${SHORT_PATH}.mat"
-FIG_PATH="${RAW_DATA_PATH}/${SESSION}/figs/${SORTER_PATH}/"
+DATA_PATH="${RAW_DATA_PATH}/${SESSION}/tables/${SESSION}-${SHORT_HASH}.mat"
+FIG_PATH="${RAW_DATA_PATH}/${SESSION}/figs/${SHORT_HASH}/"
 
 echo "DATA_PATH: $DATA_PATH"
 echo "FIG_PATH: $FIG_PATH"

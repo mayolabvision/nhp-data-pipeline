@@ -2,7 +2,7 @@
 #SBATCH --nodes=1
 #SBATCH --time=0-23:59:59
 #SBATCH --cluster=smp
-#SBATCH --partition=smp
+#SBATCH --partition=high-mem
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=16
 #SBATCH --job-name=postproc
