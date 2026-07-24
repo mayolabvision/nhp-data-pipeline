@@ -117,24 +117,23 @@ EOF
 
 ########################
 
-#echo "Plotting PURS rasters per cluster........................"
-#ALIGN="targ"
-#PURE_ONLY="0"
-#echo "ALL TRIALS, ALIGNED TO TARG"
-#matlab -nodisplay <<EOF
-#addpath(genpath('matlab'));
-#addpath(genpath('$HELPERS_PATH/plotting'));
-#addpath(genpath('$HELPERS_PATH/behavior'));
-#fprintf('Running ia_pursRasters for $1\n');
-#ia_pursRasters('$DATA_PATH', ...
-#    'PROBE_INDEX', $PROBE_ID, ...
-#    'ALIGN', '$ALIGN', ...
-#    'PURE_ONLY', logical(str2double('$PURE_ONLY')), ...
-#    'FIG_PATH', '$FIG_PATH', ...
-#    'JOB_ID', str2double(getenv('SLURM_ARRAY_TASK_ID')), ...
-#    'N_CHUNKS', str2double(getenv('SLURM_ARRAY_TASK_COUNT')));
-#exit
-#EOF
+echo "Plotting PURS rasters per cluster........................"
+ALIGN="targ"
+PURE_ONLY="0"
+echo "ALL TRIALS, ALIGNED TO TARG"
+matlab -nodisplay <<EOF
+addpath(genpath('matlab'));
+addpath(genpath('$HELPERS_PATH'));
+fprintf('Running ia_pursRasters for $1\n');
+ia_pursRasters('$DATA_PATH', ...
+    'PROBE_INDEX', $PROBE_ID, ...
+    'ALIGN', '$ALIGN', ...
+    'PURE_ONLY', logical(str2double('$PURE_ONLY')), ...
+    'FIG_PATH', '$FIG_PATH', ...
+    'JOB_ID', str2double(getenv('SLURM_ARRAY_TASK_ID')), ...
+    'N_CHUNKS', str2double(getenv('SLURM_ARRAY_TASK_COUNT')));
+exit
+EOF
 
 #ALIGN="purs"
 #PURE_ONLY="0"

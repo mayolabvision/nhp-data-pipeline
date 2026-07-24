@@ -6,14 +6,11 @@
 #SBATCH --output=/ix1/pmayo/outfiles/out_%A.out
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=16
 #SBATCH --mail-type=fail
 #SBATCH --mail-user=knoneman@pitt.edu
 #SBATCH --time=0-02:59:59
 
-echo "My SLURM_ARRAY_JOB_ID is $SLURM_ARRAY_JOB_ID."
-echo "My SLURM_ARRAY_TASK_ID is $SLURM_ARRAY_TASK_ID"
-echo "My SLURM_ARRAY_TASK_COUNT is $SLURM_ARRAY_TASK_COUNT"
 echo "Job started at $(date)"
 
 module purge 
@@ -66,7 +63,7 @@ echo "Plotting sorting QC........................"
 matlab -nodisplay <<EOF
 addpath(genpath('matlab'));
 fprintf('Running plot_sortingQC for $1\n');
-ia_mdirRasters('$DATA_PATH', '$FIG_PATH');
+plot_sortingQC('$DATA_PATH', '$FIG_PATH');
 exit
 EOF
 
